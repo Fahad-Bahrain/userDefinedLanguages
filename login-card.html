@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EKK Alert SMS Gateway - Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      min-height: 100vh;
+      background: url('your-building-background.jpg') center/cover no-repeat;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px 28px 20px;
+      width: 340px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+      text-align: center;
+    }
+
+    .logo {
+      width: 180px;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 2px;
+    }
+
+    .card-subtitle {
+      font-size: 0.78rem;
+      color: #b22222;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+
+    .fields-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .field-group {
+      flex: 1;
+      text-align: left;
+    }
+
+    .field-group label {
+      display: block;
+      font-size: 0.72rem;
+      color: #444;
+      margin-bottom: 4px;
+    }
+
+    .field-group input {
+      width: 100%;
+      padding: 7px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background: #f5f7fa;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field-group input:focus {
+      border-color: #1a3a6e;
+    }
+
+    .btn-signin {
+      width: 100%;
+      padding: 9px;
+      background: #1a3a6e;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: background 0.2s;
+    }
+
+    .btn-signin:hover {
+      background: #122b55;
+    }
+
+    .footer {
+      margin-top: 18px;
+      font-size: 0.7rem;
+      color: #ccc;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <!-- Replace src with your actual EKK logo path -->
+    <img src="ekk-logo.png" alt="Ebrahim K. Kanoo" class="logo" />
+
+    <div class="card-title">EKK Alert SMS</div>
+    <div class="card-subtitle">Alert SMS Gateway</div>
+
+    <div class="fields-row">
+      <div class="field-group">
+        <label>Username</label>
+        <input type="text" placeholder="admin" />
+      </div>
+      <div class="field-group">
+        <label>Password</label>
+        <input type="password" placeholder="••••••••" />
+      </div>
+    </div>
+
+    <button class="btn-signin">Sign In</button>
+  </div>
+
+  <div class="footer">
+    © EKK Alert SMS Gateway v1.0.2024 &nbsp;|&nbsp; Ebrahim K. Kanoo &nbsp;|&nbsp; IT Department
+  </div>
+
+</body>
+</html>
