@@ -40,18 +40,23 @@ $c = $c -replace 'C_WM_TEXT\s*=\s*"#[0-9a-fA-F]{6}"[^\n]*',
 $c = $c -replace 'C_WM_DIM\s*=\s*"#[0-9a-fA-F]{6}"[^\n]*',
                  'C_WM_DIM  = "#a8c8e4"          # AI dim elements'
 
-# ── 5. LIVE LOG: lighten from pitch-black to dark navy ────────────────────────
-# strip bg + scrolledtext bg
-$c = $c -replace '"#0d1117"', '"#1a2d4a"'
-# header bar inside live log
-$c = $c -replace '"#161b22"', '"#1e3a5e"'
-# LIVE LOG text foreground (brighter on dark navy)
-$c = $c -replace '"#c9d1d9"', '"#d0e8f8"'
-# muted log text colour
-$c = $c -replace '"#8b949e"', '"#7ab0d8"'
+# ── 5. LIVE LOG: ash gray ─────────────────────────────────────────────────────
+# strip bg + scrolledtext bg  → medium ash gray
+$c = $c -replace '"#0d1117"', '"#3a3f4b"'
+$c = $c -replace '"#1a2d4a"', '"#3a3f4b"'
+# header bar inside live log → slightly darker ash
+$c = $c -replace '"#161b22"', '"#2e3340"'
+$c = $c -replace '"#1e3a5e"', '"#2e3340"'
+# log text: dark charcoal on ash bg
+$c = $c -replace '"#c9d1d9"', '"#e8eaed"'
+$c = $c -replace '"#d0e8f8"', '"#e8eaed"'
+# LIVE LOG label text
+$c = $c -replace '"#8b949e"', '"#9aa0aa"'
+$c = $c -replace '"#7ab0d8"', '"#9aa0aa"'
 
-# ── 6. Footer bar: dark navy (not pitch black) ─────────────────────────────────
-$c = $c -replace '"#1a2133"', '"#152540"'
+# ── 6. Footer bar: dark ash gray ──────────────────────────────────────────────
+$c = $c -replace '"#1a2133"', '"#2e3340"'
+$c = $c -replace '"#152540"', '"#2e3340"'
 
 # ── 7. Login dialog bg: back to EKK corporate navy ────────────────────────────
 $c = $c -replace 'self\.configure\(bg="#[0-9a-fA-F]{6}"\)',
@@ -66,7 +71,7 @@ Write-Host "Changes:" -ForegroundColor Yellow
 Write-Host "  Header    : EKK navy blue  #1a3a6e" -ForegroundColor White
 Write-Host "  Sub-bar   : lighter navy   #245090" -ForegroundColor White
 Write-Host "  Background: light blue-white         " -ForegroundColor White
-Write-Host "  Live Log  : dark navy (not black)    " -ForegroundColor White
+Write-Host "  Live Log  : ash gray  #3a3f4b        " -ForegroundColor White
 Write-Host "  AI theme  : visible watermark colours" -ForegroundColor White
 Write-Host ""
 Write-Host "Run:" -ForegroundColor Yellow
