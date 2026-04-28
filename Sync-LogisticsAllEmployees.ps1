@@ -10,9 +10,9 @@ param([switch]$Test, [switch]$Auto, [switch]$UseCredential, [switch]$Diagnose)
 
 # ══════════════════════════════════════════════════════════════════════════════
 $SourceGroup = "AllEKKEmployees"
-$TargetGroup = "LogisticsAllEmployees"
+$TargetGroup = "Logistics Department Group"
 $LogDir      = "C:\AD-MailSync\Logs"
-$LogFile     = Join-Path $LogDir ("LogisticsAllEmployees_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+$LogFile     = Join-Path $LogDir ("LogisticsDepartmentGroup_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 
 $Departments = @(
     "Documentation - LOG"

@@ -51,9 +51,9 @@ param(
 # ══════════════════════════════════════════════════════════════════════════════
 
 $SourceGroup = "AllEKKEmployees"
-$TargetGroup = "AllTSCEmployees"
+$TargetGroup = "TSC Division Group"
 $LogDir      = "C:\AD-MailSync\Logs"
-$LogFile     = Join-Path $LogDir ("AllTSCEmployees_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+$LogFile     = Join-Path $LogDir ("TSCDivisionGroup_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 
 $TSC_Departments = @(
     "Business Development Centre - TLAS"

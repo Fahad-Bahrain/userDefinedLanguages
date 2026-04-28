@@ -10,9 +10,9 @@ param([switch]$Test, [switch]$Auto, [switch]$UseCredential, [switch]$Diagnose)
 
 # ══════════════════════════════════════════════════════════════════════════════
 $SourceGroup = "AllEKKEmployees"
-$TargetGroup = "TSRAllEmployees"
+$TargetGroup = "TSR Department Group"
 $LogDir      = "C:\AD-MailSync\Logs"
-$LogFile     = Join-Path $LogDir ("TSRAllEmployees_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+$LogFile     = Join-Path $LogDir ("TSRDepartmentGroup_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 
 $Departments = @(
     "Administration and Support - TLS"

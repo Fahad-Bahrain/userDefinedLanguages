@@ -10,9 +10,9 @@ param([switch]$Test, [switch]$Auto, [switch]$UseCredential, [switch]$Diagnose)
 
 # ══════════════════════════════════════════════════════════════════════════════
 $SourceGroup = "AllEKKEmployees"
-$TargetGroup = "TSPAllEmployees"
+$TargetGroup = "TSP Division Group"
 $LogDir      = "C:\AD-MailSync\Logs"
-$LogFile     = Join-Path $LogDir ("TSPAllEmployees_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+$LogFile     = Join-Path $LogDir ("TSPDivisionGroup_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 
 $Departments = @(
     "Accounts - TOSP"
