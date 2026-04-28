@@ -17,20 +17,33 @@
 .PARAMETER Auto
     Suppresses all prompts (for scheduled / unattended runs).
 
+.PARAMETER UseCredential
+    Prompts for alternate AD credentials (e.g. a Domain Admin account).
+    Use this when the running account lacks Write Members on AllTSCEmployees.
+
+.PARAMETER Diagnose
+    After the main sync, scans ALL AD users with matching departments to
+    identify anyone NOT in AllEKKEmployees (explains count discrepancies).
+
 .EXAMPLE
     # Preview changes only
     PowerShell -ExecutionPolicy Bypass -File .\Sync-AllTSCEmployees.ps1 -Test
 
-    # Live run (interactive)
-    PowerShell -ExecutionPolicy Bypass -File .\Sync-AllTSCEmployees.ps1
+    # Live run with DA credentials (fixes "Insufficient access rights")
+    PowerShell -ExecutionPolicy Bypass -File .\Sync-AllTSCEmployees.ps1 -UseCredential
 
-    # Scheduled / silent
+    # Live run + show missing users report
+    PowerShell -ExecutionPolicy Bypass -File .\Sync-AllTSCEmployees.ps1 -UseCredential -Diagnose
+
+    # Scheduled / silent (service account must already have Write Members)
     PowerShell -NoProfile -ExecutionPolicy Bypass -File .\Sync-AllTSCEmployees.ps1 -Auto
 #>
 
 param(
     [switch]$Test,
-    [switch]$Auto
+    [switch]$Auto,
+    [switch]$UseCredential,
+    [switch]$Diagnose
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -42,8 +55,6 @@ $TargetGroup = "AllTSCEmployees"
 $LogDir      = "C:\AD-MailSync\Logs"
 $LogFile     = Join-Path $LogDir ("AllTSCEmployees_Sync_{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 
-# Departments whose members should be in AllTSCEmployees.
-# Edit this list if departments are renamed or new ones are added.
 $TSC_Departments = @(
     "Business Development Centre - TLAS"
     "New Car Delivery Centre"
@@ -78,13 +89,12 @@ function Write-Log {
     $ts   = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $line = "[{0}] [{1,-7}] {2}" -f $ts, $Level, $Message
     $line | Out-File -FilePath $LogFile -Append -Encoding UTF8
-
     $colour = switch ($Level) {
-        "SUCCESS" { "Green"   }
-        "WARN"    { "Yellow"  }
-        "ERROR"   { "Red"     }
-        "HEADER"  { "Cyan"    }
-        default   { "White"   }
+        "SUCCESS" { "Green"  }
+        "WARN"    { "Yellow" }
+        "ERROR"   { "Red"    }
+        "HEADER"  { "Cyan"   }
+        default   { "White"  }
     }
     Write-Host $line -ForegroundColor $colour
 }
@@ -95,15 +105,12 @@ function Write-Log {
 
 Write-Log "================================================================" "HEADER"
 Write-Log "  AllTSCEmployees Group Sync  —  $(Get-Date -Format 'dd-MMM-yyyy HH:mm')" "HEADER"
-Write-Log "  Source : $SourceGroup" "HEADER"
-Write-Log "  Target : $TargetGroup" "HEADER"
-Write-Log "  Mode   : $(if ($Test) { 'TEST (dry-run — no AD changes)' } else { 'LIVE' })" "HEADER"
+Write-Log "  Source : $SourceGroup  →  Target : $TargetGroup" "HEADER"
+Write-Log "  Mode   : $(if ($Test) { 'TEST (dry-run)' } elseif ($UseCredential) { 'LIVE (with alternate credentials)' } else { 'LIVE' })" "HEADER"
 Write-Log "================================================================" "HEADER"
 
 if ($Test) {
-    Write-Host ""
-    Write-Host "  *** TEST MODE: all changes are simulated only ***" -ForegroundColor Yellow
-    Write-Host ""
+    Write-Host "`n  *** TEST MODE: all changes are simulated only ***`n" -ForegroundColor Yellow
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -118,10 +125,32 @@ try {
     exit 1
 }
 
+# Collect credentials if requested
+$adCred = $null
+if ($UseCredential) {
+    Write-Host ""
+    Write-Host "  Enter credentials with Write Members permission on '$TargetGroup'" -ForegroundColor Cyan
+    Write-Host "  (e.g. DOMAIN\Administrator or your DA account)" -ForegroundColor Cyan
+    Write-Host ""
+    $adCred = Get-Credential
+    if (-not $adCred) {
+        Write-Log "No credentials supplied. Exiting." "ERROR"
+        exit 1
+    }
+    Write-Log ("Credentials supplied for: {0}" -f $adCred.UserName)
+}
+
+# Helper: build common AD splatting params
+function Get-ADParams {
+    $p = @{}
+    if ($adCred) { $p['Credential'] = $adCred }
+    return $p
+}
+
 # Verify both groups exist
 foreach ($grp in @($SourceGroup, $TargetGroup)) {
     try {
-        Get-ADGroup -Identity $grp -ErrorAction Stop | Out-Null
+        Get-ADGroup -Identity $grp @(Get-ADParams) -ErrorAction Stop | Out-Null
         Write-Log "Group verified: $grp"
     } catch {
         Write-Log "Group '$grp' not found in AD. $_" "ERROR"
@@ -133,22 +162,22 @@ foreach ($grp in @($SourceGroup, $TargetGroup)) {
 #  STEP 1 — Read AllEKKEmployees and filter by TSC departments
 # ══════════════════════════════════════════════════════════════════════════════
 
-Write-Log "--- Step 1: Reading $SourceGroup members ---" "INFO"
+Write-Log "--- Step 1: Reading $SourceGroup members ---"
 
 try {
-    $allEKK = Get-ADGroupMember -Identity $SourceGroup -Recursive |
+    $adParams = Get-ADParams
+    $allEKK = Get-ADGroupMember -Identity $SourceGroup -Recursive @adParams |
         Where-Object { $_.objectClass -eq 'user' } |
         ForEach-Object {
-            Get-ADUser -Identity $_.DistinguishedName `
+            Get-ADUser -Identity $_.DistinguishedName @adParams `
                 -Properties DisplayName, Department, EmailAddress, SamAccountName
         }
-    Write-Log ("Total members in {0}: {1}" -f $SourceGroup, $allEKK.Count)
+    Write-Log ("Total users in {0}: {1}" -f $SourceGroup, $allEKK.Count)
 } catch {
     Write-Log "Failed to read '$SourceGroup': $_" "ERROR"
     exit 1
 }
 
-# Filter to TSC departments (case-insensitive exact match)
 $tscFiltered = $allEKK | Where-Object {
     $dept = $_.Department
     $TSC_Departments | Where-Object { $_ -ieq $dept }
@@ -158,8 +187,6 @@ Write-Log ("Users matching TSC departments: {0}" -f $tscFiltered.Count) "INFO"
 
 if ($tscFiltered.Count -eq 0) {
     Write-Log "No users matched. Verify Department values in AD match the list in this script." "WARN"
-    Write-Log "Configured departments:" "WARN"
-    $TSC_Departments | ForEach-Object { Write-Log "  - $_" "WARN" }
     exit 0
 }
 
@@ -175,13 +202,14 @@ $tscDNs = $tscFiltered | Select-Object -ExpandProperty DistinguishedName
 #  STEP 2 — Read current AllTSCEmployees members
 # ══════════════════════════════════════════════════════════════════════════════
 
-Write-Log "--- Step 2: Reading current $TargetGroup members ---" "INFO"
+Write-Log "--- Step 2: Reading current $TargetGroup members ---"
 
 try {
-    $currentTSC = Get-ADGroupMember -Identity $TargetGroup -Recursive |
+    $adParams = Get-ADParams
+    $currentTSC = Get-ADGroupMember -Identity $TargetGroup -Recursive @adParams |
         Where-Object { $_.objectClass -eq 'user' } |
         ForEach-Object {
-            Get-ADUser -Identity $_.DistinguishedName `
+            Get-ADUser -Identity $_.DistinguishedName @adParams `
                 -Properties DisplayName, Department, EmailAddress, SamAccountName
         }
     $currentDNs = $currentTSC | Select-Object -ExpandProperty DistinguishedName
@@ -195,17 +223,13 @@ try {
 #  STEP 3 — Calculate delta
 # ══════════════════════════════════════════════════════════════════════════════
 
-Write-Log "--- Step 3: Calculating changes ---" "INFO"
+Write-Log "--- Step 3: Calculating changes ---"
 
-# To ADD: in filtered TSC list but not yet in AllTSCEmployees
-$toAdd = $tscFiltered | Where-Object { $currentDNs -notcontains $_.DistinguishedName }
-
-# To REMOVE: currently in AllTSCEmployees but department no longer matches TSC list
-$toRemove = $currentTSC | Where-Object {
+$toAdd    = $tscFiltered | Where-Object { $currentDNs -notcontains $_.DistinguishedName }
+$toRemove = $currentTSC  | Where-Object {
     $dept = $_.Department
     -not ($TSC_Departments | Where-Object { $_ -ieq $dept })
 }
-
 $alreadyCorrect = $tscFiltered | Where-Object { $currentDNs -contains $_.DistinguishedName }
 
 Write-Log ("  Already correct (no change): {0}" -f $alreadyCorrect.Count)
@@ -215,94 +239,141 @@ Write-Log ("  To REMOVE                  : {0}" -f $toRemove.Count) "INFO"
 if ($toAdd.Count -eq 0 -and $toRemove.Count -eq 0) {
     Write-Log "$TargetGroup is already fully in sync. Nothing to do." "SUCCESS"
     Write-Log "===== Sync Complete — no changes needed =====" "SUCCESS"
-    exit 0
-}
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  STEP 4 — Confirm (interactive mode only)
-# ══════════════════════════════════════════════════════════════════════════════
-
-if (-not $Auto -and -not $Test) {
-    Write-Host ""
-    Write-Host "  Pending changes:" -ForegroundColor Cyan
-    Write-Host ("    ADD    {0} users" -f $toAdd.Count)    -ForegroundColor Green
-    Write-Host ("    REMOVE {0} users" -f $toRemove.Count) -ForegroundColor Yellow
-    Write-Host ""
-    $confirm = Read-Host "  Proceed? (yes/no)"
-    if ($confirm -notmatch '^y') {
-        Write-Log "User cancelled. No changes made." "WARN"
-        exit 0
-    }
-}
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  STEP 5 — Apply changes
-# ══════════════════════════════════════════════════════════════════════════════
-
-$addedOK = 0; $addedErr = 0
-$removedOK = 0; $removedErr = 0
-
-# --- ADD ---
-if ($toAdd.Count -gt 0) {
-    Write-Log "--- Adding users ---" "INFO"
-    foreach ($user in $toAdd | Sort-Object DisplayName) {
-        $label = "{0} ({1}) [{2}]" -f $user.DisplayName, $user.SamAccountName, $user.Department
-        if ($Test) {
-            Write-Log "  [DRY-RUN ADD] $label" "INFO"
-            $addedOK++
-        } else {
-            try {
-                Add-ADGroupMember -Identity $TargetGroup -Members $user.DistinguishedName -ErrorAction Stop
-                Write-Log "  [ADDED] $label" "SUCCESS"
-                $addedOK++
-            } catch {
-                Write-Log "  [ADD ERROR] $label — $_" "ERROR"
-                $addedErr++
-            }
-        }
-    }
-}
-
-# --- REMOVE ---
-if ($toRemove.Count -gt 0) {
-    Write-Log "--- Removing users (department no longer TSC) ---" "INFO"
-    foreach ($user in $toRemove | Sort-Object DisplayName) {
-        $label = "{0} ({1}) [{2}]" -f $user.DisplayName, $user.SamAccountName, $user.Department
-        if ($Test) {
-            Write-Log "  [DRY-RUN REMOVE] $label" "WARN"
-            $removedOK++
-        } else {
-            try {
-                Remove-ADGroupMember -Identity $TargetGroup -Members $user.DistinguishedName `
-                    -Confirm:$false -ErrorAction Stop
-                Write-Log "  [REMOVED] $label" "WARN"
-                $removedOK++
-            } catch {
-                Write-Log "  [REMOVE ERROR] $label — $_" "ERROR"
-                $removedErr++
-            }
-        }
-    }
-}
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  SUMMARY
-# ══════════════════════════════════════════════════════════════════════════════
-
-Write-Log "================================================================" "HEADER"
-Write-Log "  SYNC SUMMARY$(if ($Test) { '  (TEST — no real changes)' })" "HEADER"
-Write-Log "----------------------------------------------------------------" "HEADER"
-Write-Log ("  TSC-matched users in {0}   : {1}" -f $SourceGroup, $tscFiltered.Count)
-Write-Log ("  Members already correct        : {0}" -f $alreadyCorrect.Count)
-if ($Test) {
-    Write-Log ("  Would be ADDED                 : {0}" -f $addedOK)   "SUCCESS"
-    Write-Log ("  Would be REMOVED               : {0}" -f $removedOK) "WARN"
 } else {
-    Write-Log ("  ADDED successfully             : {0}" -f $addedOK)   "SUCCESS"
-    Write-Log ("  REMOVED successfully           : {0}" -f $removedOK) "WARN"
-    if ($addedErr -gt 0)   { Write-Log ("  ADD errors                     : {0}" -f $addedErr)   "ERROR" }
-    if ($removedErr -gt 0) { Write-Log ("  REMOVE errors                  : {0}" -f $removedErr) "ERROR" }
+
+    # ── Confirm (interactive) ─────────────────────────────────────────────────
+    if (-not $Auto -and -not $Test) {
+        Write-Host ""
+        Write-Host ("  Pending: ADD {0} users,  REMOVE {1} users" -f $toAdd.Count, $toRemove.Count) -ForegroundColor Cyan
+        $confirm = Read-Host "  Proceed? (yes/no)"
+        if ($confirm -notmatch '^y') {
+            Write-Log "User cancelled. No changes made." "WARN"
+            exit 0
+        }
+    }
+
+    # ── ADD (batch for efficiency, fallback to per-user on error) ─────────────
+    $addedOK = 0; $addedErr = 0
+
+    if ($toAdd.Count -gt 0) {
+        Write-Log "--- Adding $($toAdd.Count) users (batch) ---"
+        if ($Test) {
+            $toAdd | Sort-Object DisplayName | ForEach-Object {
+                Write-Log ("  [DRY-RUN ADD] {0} ({1}) [{2}]" -f $_.DisplayName, $_.SamAccountName, $_.Department)
+            }
+            $addedOK = $toAdd.Count
+        } else {
+            # Try batch add first (most efficient)
+            try {
+                $adParams = Get-ADParams
+                Add-ADGroupMember -Identity $TargetGroup `
+                    -Members ($toAdd | Select-Object -ExpandProperty DistinguishedName) `
+                    @adParams -ErrorAction Stop
+                $addedOK = $toAdd.Count
+                Write-Log ("  [BATCH ADDED] {0} users added successfully." -f $addedOK) "SUCCESS"
+            } catch {
+                Write-Log "Batch add failed, falling back to per-user mode: $_" "WARN"
+                # Per-user fallback
+                foreach ($user in $toAdd | Sort-Object DisplayName) {
+                    $label = "{0} ({1}) [{2}]" -f $user.DisplayName, $user.SamAccountName, $user.Department
+                    try {
+                        $adParams = Get-ADParams
+                        Add-ADGroupMember -Identity $TargetGroup `
+                            -Members $user.DistinguishedName @adParams -ErrorAction Stop
+                        Write-Log "  [ADDED] $label" "SUCCESS"
+                        $addedOK++
+                    } catch {
+                        Write-Log "  [ADD ERROR] $label — $_" "ERROR"
+                        $addedErr++
+                    }
+                }
+            }
+        }
+    }
+
+    # ── REMOVE ────────────────────────────────────────────────────────────────
+    $removedOK = 0; $removedErr = 0
+
+    if ($toRemove.Count -gt 0) {
+        Write-Log "--- Removing $($toRemove.Count) users (dept no longer TSC) ---"
+        foreach ($user in $toRemove | Sort-Object DisplayName) {
+            $label = "{0} ({1}) [{2}]" -f $user.DisplayName, $user.SamAccountName, $user.Department
+            if ($Test) {
+                Write-Log "  [DRY-RUN REMOVE] $label" "WARN"
+                $removedOK++
+            } else {
+                try {
+                    $adParams = Get-ADParams
+                    Remove-ADGroupMember -Identity $TargetGroup `
+                        -Members $user.DistinguishedName @adParams -Confirm:$false -ErrorAction Stop
+                    Write-Log "  [REMOVED] $label" "WARN"
+                    $removedOK++
+                } catch {
+                    Write-Log "  [REMOVE ERROR] $label — $_" "ERROR"
+                    $removedErr++
+                }
+            }
+        }
+    }
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    Write-Log "================================================================" "HEADER"
+    Write-Log "  SYNC SUMMARY$(if ($Test) { '  (TEST — no real changes)' })" "HEADER"
+    Write-Log "----------------------------------------------------------------" "HEADER"
+    Write-Log ("  TSC-matched in {0}          : {1}" -f $SourceGroup, $tscFiltered.Count)
+    Write-Log ("  Already correct                : {0}" -f $alreadyCorrect.Count)
+    if ($Test) {
+        Write-Log ("  Would be ADDED                 : {0}" -f $addedOK)   "SUCCESS"
+        Write-Log ("  Would be REMOVED               : {0}" -f $removedOK) "WARN"
+    } else {
+        Write-Log ("  ADDED successfully             : {0}" -f $addedOK)   "SUCCESS"
+        Write-Log ("  REMOVED successfully           : {0}" -f $removedOK) "WARN"
+        if ($addedErr   -gt 0) { Write-Log ("  ADD errors                     : {0}  ← check permissions" -f $addedErr)   "ERROR" }
+        if ($removedErr -gt 0) { Write-Log ("  REMOVE errors                  : {0}" -f $removedErr) "ERROR" }
+    }
 }
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  OPTIONAL: DIAGNOSE missing users (why count < expected)
+# ══════════════════════════════════════════════════════════════════════════════
+
+if ($Diagnose) {
+    Write-Log "================================================================" "HEADER"
+    Write-Log "  DIAGNOSTIC: Finding TSC users NOT in $SourceGroup" "HEADER"
+    Write-Log "----------------------------------------------------------------" "HEADER"
+    Write-Log "Searching all AD users with matching department attributes..."
+
+    try {
+        $adParams = Get-ADParams
+        $ekk_DNs  = $allEKK | Select-Object -ExpandProperty DistinguishedName
+
+        $allTSCInAD = @()
+        foreach ($dept in $TSC_Departments) {
+            $found = Get-ADUser -Filter "Department -eq '$dept' -and Enabled -eq `$true" `
+                -Properties DisplayName, Department, SamAccountName @adParams
+            $allTSCInAD += $found
+        }
+        $allTSCInAD = $allTSCInAD | Sort-Object DistinguishedName -Unique
+
+        Write-Log ("  Total enabled AD users with TSC departments : {0}" -f $allTSCInAD.Count)
+        Write-Log ("  Members found via $SourceGroup              : {0}" -f $tscFiltered.Count)
+
+        $notInEKK = $allTSCInAD | Where-Object { $ekk_DNs -notcontains $_.DistinguishedName }
+
+        if ($notInEKK.Count -eq 0) {
+            Write-Log "  All TSC dept users ARE in $SourceGroup. Count difference may be disabled accounts." "SUCCESS"
+        } else {
+            Write-Log ("  Users with TSC dept but NOT in {0}: {1}" -f $SourceGroup, $notInEKK.Count) "WARN"
+            Write-Log "  These users need to be added to $SourceGroup first:" "WARN"
+            $notInEKK | Sort-Object DisplayName | ForEach-Object {
+                Write-Log ("    {0,-40} ({1,-20}) [{2}]" -f $_.DisplayName, $_.SamAccountName, $_.Department) "WARN"
+            }
+        }
+    } catch {
+        Write-Log "Diagnostic query failed: $_" "ERROR"
+    }
+}
+
 Write-Log "----------------------------------------------------------------" "HEADER"
-Write-Log ("  Log file: $LogFile") "INFO"
+Write-Log ("  Log : $LogFile")
 Write-Log "================================================================" "HEADER"
