@@ -14,32 +14,35 @@
 <div class="login-wrap">
   <div class="login-card">
 
-    <div class="login-logo">
+    <!-- Blue header section -->
+    <div class="card-header">
       <img src="/logo" alt="Ekkanoo" class="login-ekk-logo"
            onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'logo-circle',textContent:'EKK'}))">
       <h1>Oracle Print Portal</h1>
       <p class="subtitle">Printer Queue Management</p>
     </div>
 
-    {% if error %}
-    <div class="alert alert-error">{{ error }}</div>
-    {% endif %}
+    <!-- Form section -->
+    <div class="card-body">
+      {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
 
-    <form method="POST" action="/login" autocomplete="off">
-      <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username"
-               placeholder="Enter your username" autofocus required>
-      </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password"
-               placeholder="Enter your password" required>
-      </div>
-      <button type="submit" class="btn-login">Sign In</button>
-    </form>
+      <form method="POST" action="/login" autocomplete="off">
+        <div class="field-row">
+          <span class="field-label">Username</span>
+          <input type="text" name="username" placeholder="Enter your username" autofocus required>
+        </div>
+        <div class="field-row">
+          <span class="field-label">Password</span>
+          <input type="password" name="password" placeholder="Enter your password" required>
+        </div>
+        <button type="submit" class="btn-login">Sign In</button>
+      </form>
 
-    <p class="login-footer">Ebrahim K. Kanoo &bull; Bahrain &bull; IT Department</p>
+      <p class="login-footer">Ebrahim K. Kanoo &bull; Bahrain &bull; IT Department</p>
+    </div>
+
   </div>
 </div>
 
