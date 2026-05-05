@@ -16,120 +16,80 @@ body {
   position: relative;
   min-height: 100vh;
   display: flex;
-  align-items: flex-start;      /* card sits at the top */
+  align-items: flex-start;
   justify-content: center;
-  padding-top: 32px;
+  padding-top: 5vh;
   background: #0d1f33;
 }
 
-/* Toyota Plaza background — building visible below the card */
+/* Toyota Plaza — show building below the card */
 .login-bg {
   position: fixed; inset: 0; z-index: 0;
-  background: url('/bg') center bottom / cover no-repeat;
-  opacity: 0.72;
+  background: url('/bg') center 30% / cover no-repeat;
+  opacity: 0.80;
   pointer-events: none;
 }
 
-/* subtle dark strip at very top for card readability */
+/* very light dark veil across whole page for contrast */
 .login-page::after {
   content: '';
-  position: fixed; top: 0; left: 0; right: 0; height: 220px; z-index: 0;
-  background: linear-gradient(to bottom, rgba(10,25,47,0.55) 0%, transparent 100%);
+  position: fixed; inset: 0; z-index: 0;
+  background: rgba(8, 20, 40, 0.28);
   pointer-events: none;
 }
 
 .login-wrap {
   position: relative; z-index: 1;
-  width: 95%; max-width: 860px;
+  width: 100%; max-width: 400px;
+  padding: 0 16px;
 }
 
-/* ── Horizontal card ── */
+/* ── Vertical card ── */
 .login-card {
-  background: rgba(255,255,255,0.96);
-  border-radius: 14px;
-  padding: 0;
-  box-shadow: 0 8px 40px rgba(0,0,0,.45);
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  overflow: hidden;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 32px 32px 24px;
+  box-shadow: 0 16px 56px rgba(0, 0, 0, 0.50);
+  backdrop-filter: blur(4px);
 }
 
-/* Left panel */
-.login-left {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 28px 32px;
-  background: #1a3a5c;
-  min-width: 220px;
-  text-align: center;
-}
+.login-logo { text-align: center; margin-bottom: 22px; }
 
 .login-ekk-logo {
-  height: 44px; width: auto;
-  display: block; margin: 0 auto 14px;
+  height: 40px; width: auto;
+  display: block; margin: 0 auto 12px;
   object-fit: contain;
-  filter: brightness(0) invert(1);   /* white logo on dark panel */
 }
 
 .logo-circle {
   display: inline-flex; align-items: center; justify-content: center;
   width: 52px; height: 52px; border-radius: 50%;
-  background: rgba(255,255,255,0.2); color: #fff;
+  background: #1565c0; color: #fff;
   font-size: 18px; font-weight: 700; margin-bottom: 12px;
 }
 
-.login-left h1    { font-size: 17px; color: #fff; font-weight: 700; line-height: 1.3; }
-.subtitle         { color: #8b1a1a; font-size: 11.5px; margin-top: 6px; font-weight: 700;
-                    background: #fff; padding: 2px 8px; border-radius: 10px; }
+.login-logo h1 { font-size: 21px; color: #1a3a5c; font-weight: 700; }
+.subtitle      { color: #8b1a1a; font-size: 12px; margin-top: 5px; font-weight: 700; }
 
-/* Divider */
-.login-divider {
-  width: 1px;
-  background: #e0e6ef;
-  flex-shrink: 0;
-}
-
-/* Right panel */
-.login-right {
-  flex: 1;
-  padding: 28px 30px 22px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-/* Horizontal form row */
-.form-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.form-group       { flex: 1; min-width: 150px; }
-.form-group label { display: block; font-weight: 600; margin-bottom: 5px; color: #444; font-size: 13px; }
-
-.form-group input {
-  width: 100%; padding: 9px 12px;
-  border: 1px solid #ddd; border-radius: 6px;
+.form-group          { margin-bottom: 16px; }
+.form-group label    { display: block; font-weight: 600; margin-bottom: 5px; color: #444; font-size: 13px; }
+.form-group input    {
+  width: 100%; padding: 10px 13px;
+  border: 1px solid #d5dbe6; border-radius: 7px;
   font-size: 14px; transition: border-color .2s;
 }
 .form-group input:focus { outline: none; border-color: #1565c0; box-shadow: 0 0 0 3px rgba(21,101,192,.15); }
 
 .btn-login {
-  padding: 9px 26px;
+  width: 100%; padding: 11px;
   background: #1565c0; color: #fff;
-  border: none; border-radius: 6px;
-  font-size: 14px; font-weight: 700; cursor: pointer;
-  transition: background .2s; white-space: nowrap; flex-shrink: 0;
-  align-self: flex-end;
+  border: none; border-radius: 7px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background .2s; margin-top: 4px;
 }
 .btn-login:hover { background: #0d47a1; }
 
-.login-footer { margin-top: 16px; color: #8b1a1a; font-size: 12px; font-weight: 600; }
+.login-footer { text-align: center; margin-top: 18px; color: #8b1a1a; font-size: 12px; font-weight: 600; }
 
 .form-group input {
   width: 100%; padding: 10px 14px;

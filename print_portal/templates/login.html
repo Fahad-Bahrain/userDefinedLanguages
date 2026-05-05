@@ -14,41 +14,32 @@
 <div class="login-wrap">
   <div class="login-card">
 
-    <!-- Left panel: logo + title -->
-    <div class="login-left">
+    <div class="login-logo">
       <img src="/logo" alt="Ekkanoo" class="login-ekk-logo"
            onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'logo-circle',textContent:'EKK'}))">
       <h1>Oracle Print Portal</h1>
       <p class="subtitle">Printer Queue Management</p>
     </div>
 
-    <div class="login-divider"></div>
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
 
-    <!-- Right panel: form -->
-    <div class="login-right">
-      {% if error %}
-      <div class="alert alert-error">{{ error }}</div>
-      {% endif %}
+    <form method="POST" action="/login" autocomplete="off">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username"
+               placeholder="Enter your username" autofocus required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password"
+               placeholder="Enter your password" required>
+      </div>
+      <button type="submit" class="btn-login">Sign In</button>
+    </form>
 
-      <form method="POST" action="/login" autocomplete="off">
-        <div class="form-row">
-          <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username"
-                   placeholder="Username" autofocus required>
-          </div>
-          <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password"
-                   placeholder="Password" required>
-          </div>
-          <button type="submit" class="btn-login">Sign In</button>
-        </div>
-      </form>
-
-      <p class="login-footer">Ebrahim K. Kanoo &bull; Bahrain &bull; IT Department</p>
-    </div>
-
+    <p class="login-footer">Ebrahim K. Kanoo &bull; Bahrain &bull; IT Department</p>
   </div>
 </div>
 
