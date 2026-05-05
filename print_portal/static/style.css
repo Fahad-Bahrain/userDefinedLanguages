@@ -18,14 +18,14 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 8vh;
+  padding-top: 2vh;
   background: #0d1f33;
 }
 
-/* Toyota Plaza background */
+/* Toyota Plaza background — push building lower so card sits above it */
 .login-bg {
   position: fixed; inset: 0; z-index: 0;
-  background: url('/bg') center 25% / cover no-repeat;
+  background: url('/bg') center 55% / cover no-repeat;
   opacity: 0.85;
   pointer-events: none;
 }
