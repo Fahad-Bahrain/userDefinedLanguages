@@ -15,11 +15,14 @@ body {
 .login-page {
   position: relative;
   min-height: 100vh;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6%;
   background: #0d1f33;
 }
 
-/* Toyota Plaza background image at 30% opacity (70% watermark) */
+/* Toyota Plaza background image at 65% opacity */
 .login-bg {
   position: fixed; inset: 0; z-index: 0;
   background: url('/bg') center / cover no-repeat;
@@ -27,9 +30,17 @@ body {
   pointer-events: none;
 }
 
+/* dark gradient on right so card stays readable */
+.login-page::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background: linear-gradient(to left, rgba(10,25,47,0.58) 30%, transparent 68%);
+  pointer-events: none;
+}
+
 .login-wrap {
   position: relative; z-index: 1;
-  width: 100%; max-width: 420px; padding: 16px;
+  width: 100%; max-width: 400px;
 }
 
 .login-card {
