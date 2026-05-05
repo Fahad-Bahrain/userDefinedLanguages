@@ -1,6 +1,6 @@
 {
   "ict": {
-    "password": "ict@2024",
+    "password": "ictprt@2026",
     "name": "ICT Admin",
     "role": "admin",
     "prefixes": []
@@ -9,19 +9,19 @@
     "password": "Anoop@123",
     "name": "Anoop",
     "role": "user",
-    "prefixes": ["TP_"]
+    "prefixes": ["TSC_TPL", "TBSC_TPL", "TSC_SITRA", "TP_SITRA"]
   },
   "rakesh": {
     "password": "Rakesh@123",
     "name": "Rakesh",
     "role": "user",
-    "prefixes": ["TP_"]
+    "prefixes": ["TSC_TPL", "TBSC_TPL", "TSC_SITRA", "TP_SITRA"]
   },
   "vipin": {
     "password": "Vipin@123",
     "name": "Vipin",
     "role": "user",
-    "prefixes": ["KP_", "KPS_", "KPC_"]
+    "prefixes": ["TP_", "KP_", "KPS_", "KPC_"]
   },
   "vimala": {
     "password": "Vimala@123",
@@ -33,6 +33,6 @@
     "password": "Azzat@123",
     "name": "Azzat",
     "role": "user",
-    "prefixes": ["TSC_", "TBSC_", "KBSC_"]
+    "prefixes": ["TSC_ARAD", "TBSC_ARAD", "KBSC_ARAD"]
   }
 }
