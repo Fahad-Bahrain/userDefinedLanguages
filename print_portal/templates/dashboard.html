@@ -285,8 +285,11 @@ function doAction(action, queue, ip) {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-// Auto-load status on page ready
-window.addEventListener('load', loadStatus);
+// Auto-load on page ready, then refresh every 3 minutes
+window.addEventListener('load', () => {
+  loadStatus();
+  setInterval(loadStatus, 3 * 60 * 1000);
+});
 </script>
 
 </body>
