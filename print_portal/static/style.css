@@ -42,8 +42,8 @@ body {
 .login-logo { text-align: center; margin-bottom: 24px; }
 
 .login-ekk-logo {
-  height: 72px; width: auto;
-  display: block; margin: 0 auto 14px;
+  height: 36px; width: auto;
+  display: block; margin: 0 auto 12px;
   object-fit: contain;
 }
 
@@ -55,7 +55,7 @@ body {
 }
 
 .login-logo h1  { font-size: 22px; color: #1a3a5c; font-weight: 700; }
-.subtitle       { color: #888; font-size: 13px; margin-top: 4px; }
+.subtitle       { color: #8b1a1a; font-size: 13px; margin-top: 4px; font-weight: 600; }
 
 .form-group       { margin-bottom: 18px; }
 .form-group label { display: block; font-weight: 600; margin-bottom: 6px; color: #444; }
@@ -75,7 +75,7 @@ body {
 }
 .btn-login:hover { background: #0d47a1; }
 
-.login-footer { text-align: center; margin-top: 22px; color: #aaa; font-size: 12px; }
+.login-footer { text-align: center; margin-top: 22px; color: #8b1a1a; font-size: 12px; font-weight: 600; }
 
 /* ── Alerts ── */
 .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
