@@ -16,60 +16,120 @@ body {
   position: relative;
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 6%;
+  align-items: flex-start;      /* card sits at the top */
+  justify-content: center;
+  padding-top: 32px;
   background: #0d1f33;
 }
 
-/* Toyota Plaza background image at 65% opacity */
+/* Toyota Plaza background — building visible below the card */
 .login-bg {
   position: fixed; inset: 0; z-index: 0;
-  background: url('/bg') center / cover no-repeat;
-  opacity: 0.65;
+  background: url('/bg') center bottom / cover no-repeat;
+  opacity: 0.72;
   pointer-events: none;
 }
 
-/* dark gradient on right so card stays readable */
+/* subtle dark strip at very top for card readability */
 .login-page::after {
   content: '';
-  position: fixed; inset: 0; z-index: 0;
-  background: linear-gradient(to left, rgba(10,25,47,0.58) 30%, transparent 68%);
+  position: fixed; top: 0; left: 0; right: 0; height: 220px; z-index: 0;
+  background: linear-gradient(to bottom, rgba(10,25,47,0.55) 0%, transparent 100%);
   pointer-events: none;
 }
 
 .login-wrap {
   position: relative; z-index: 1;
-  width: 100%; max-width: 400px;
+  width: 95%; max-width: 860px;
 }
 
+/* ── Horizontal card ── */
 .login-card {
-  background: rgba(255,255,255,0.97);
+  background: rgba(255,255,255,0.96);
   border-radius: 14px;
-  padding: 36px 36px 28px;
-  box-shadow: 0 12px 48px rgba(0,0,0,.45);
+  padding: 0;
+  box-shadow: 0 8px 40px rgba(0,0,0,.45);
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
 }
 
-.login-logo { text-align: center; margin-bottom: 24px; }
+/* Left panel */
+.login-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 32px;
+  background: #1a3a5c;
+  min-width: 220px;
+  text-align: center;
+}
 
 .login-ekk-logo {
-  height: 36px; width: auto;
-  display: block; margin: 0 auto 12px;
+  height: 44px; width: auto;
+  display: block; margin: 0 auto 14px;
   object-fit: contain;
+  filter: brightness(0) invert(1);   /* white logo on dark panel */
 }
 
 .logo-circle {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 72px; height: 72px; border-radius: 50%;
-  background: #1565c0; color: #fff;
-  font-size: 22px; font-weight: 700; margin-bottom: 14px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(255,255,255,0.2); color: #fff;
+  font-size: 18px; font-weight: 700; margin-bottom: 12px;
 }
 
-.login-logo h1  { font-size: 22px; color: #1a3a5c; font-weight: 700; }
-.subtitle       { color: #8b1a1a; font-size: 13px; margin-top: 4px; font-weight: 600; }
+.login-left h1    { font-size: 17px; color: #fff; font-weight: 700; line-height: 1.3; }
+.subtitle         { color: #8b1a1a; font-size: 11.5px; margin-top: 6px; font-weight: 700;
+                    background: #fff; padding: 2px 8px; border-radius: 10px; }
 
-.form-group       { margin-bottom: 18px; }
-.form-group label { display: block; font-weight: 600; margin-bottom: 6px; color: #444; }
+/* Divider */
+.login-divider {
+  width: 1px;
+  background: #e0e6ef;
+  flex-shrink: 0;
+}
+
+/* Right panel */
+.login-right {
+  flex: 1;
+  padding: 28px 30px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Horizontal form row */
+.form-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.form-group       { flex: 1; min-width: 150px; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 5px; color: #444; font-size: 13px; }
+
+.form-group input {
+  width: 100%; padding: 9px 12px;
+  border: 1px solid #ddd; border-radius: 6px;
+  font-size: 14px; transition: border-color .2s;
+}
+.form-group input:focus { outline: none; border-color: #1565c0; box-shadow: 0 0 0 3px rgba(21,101,192,.15); }
+
+.btn-login {
+  padding: 9px 26px;
+  background: #1565c0; color: #fff;
+  border: none; border-radius: 6px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background .2s; white-space: nowrap; flex-shrink: 0;
+  align-self: flex-end;
+}
+.btn-login:hover { background: #0d47a1; }
+
+.login-footer { margin-top: 16px; color: #8b1a1a; font-size: 12px; font-weight: 600; }
 
 .form-group input {
   width: 100%; padding: 10px 14px;
