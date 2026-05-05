@@ -11,11 +11,22 @@
 
 <!-- ── Top Nav ── -->
 <nav class="topnav">
-  <div class="nav-brand">
-    <img src="/logo" alt="EKK" class="nav-logo" onerror="this.style.display='none'">
-    <span class="brand-title">Oracle Print Portal</span>
+  <!-- Left: logo -->
+  <div class="nav-left">
+    <div class="nav-logo-box">
+      <img src="/logo" alt="EKK" class="nav-logo"
+           onerror="this.parentElement.innerHTML='<span class=\'nav-logo-text\'>EKK</span>'">
+    </div>
   </div>
-  <div class="nav-user">
+
+  <!-- Center: title + subtitle -->
+  <div class="nav-center">
+    <div class="nav-title">Oracle Print Portal</div>
+    <div class="nav-subtitle">Printer Queue Management</div>
+  </div>
+
+  <!-- Right: user + logout -->
+  <div class="nav-right">
     <span class="user-name">{{ user.name }}</span>
     {% if user.role == 'admin' %}<span class="role-badge">Admin</span>{% endif %}
     <a href="/logout" class="btn-logout">Logout</a>

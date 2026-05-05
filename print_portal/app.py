@@ -138,7 +138,7 @@ def login():
             session["role"]     = users[username]["role"]
             return redirect(url_for("dashboard"))
         error = "Invalid username or password."
-    return render_template("login.html", error=error)
+    return render_template("login.html", error=error, version=APP_VERSION)
 
 
 @app.route("/logout")
