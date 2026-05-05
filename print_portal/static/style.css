@@ -231,10 +231,12 @@ body {
 .printer-table tbody tr:hover { background: #f5f8ff; }
 
 /* Row status colors */
-.row-disabled { background: #fff3cd !important; }
-.row-disabled:hover { background: #fff0b3 !important; }
-.row-unknown  { background: #fff8f8 !important; }
-.row-printing { background: #e8f5e9 !important; }
+.row-disabled       { background: #ffebee !important; }
+.row-disabled:hover { background: #ffcdd2 !important; }
+.row-stuck          { background: #fff3e0 !important; }
+.row-stuck:hover    { background: #ffe0b2 !important; }
+.row-printing       { background: #e8f5e9 !important; }
+.row-unknown        { background: #fafafa !important; }
 
 .printer-table td { padding: 9px 12px; vertical-align: middle; }
 
@@ -248,7 +250,8 @@ body {
 .status-dot   { font-size: 12px; white-space: nowrap; }
 .st-idle      { color: #2e7d32; }
 .st-printing  { color: #1565c0; }
-.st-disabled  { color: #e65100; font-weight: 700; }
+.st-stuck     { color: #e65100; font-weight: 700; }
+.st-disabled  { color: #c62828; font-weight: 700; }
 .st-unknown   { color: #999; }
 
 /* ── Action Buttons ── */

@@ -129,17 +129,27 @@
 </div>
 
 <script>
-// ── Status loading ────────────────────────────────────────────────────────
+// ── Status labels ─────────────────────────────────────────────────────────
 const STATUS_LABELS = {
-  idle:     { text: '● Idle',     cls: 'st-idle'     },
+  idle:     { text: '● Ready',    cls: 'st-idle'     },
   printing: { text: '● Printing', cls: 'st-printing' },
-  disabled: { text: '● Disabled', cls: 'st-disabled' },
+  stuck:    { text: '● Stuck',    cls: 'st-stuck'    },
+  disabled: { text: '● Down',     cls: 'st-disabled' },
   unknown:  { text: '● Unknown',  cls: 'st-unknown'  },
   nodata:   { text: '—',          cls: 'st-unknown'  }
 };
 
-function safeId(queue) {
-  return 'st-' + queue.replace(/_/g, '-');
+const STUCK_MS = 5 * 60 * 1000; // 5 minutes
+
+function safeId(queue) { return 'st-' + queue.replace(/_/g, '-'); }
+
+function markPrinting(queue) {
+  if (!localStorage.getItem('ps_' + queue)) localStorage.setItem('ps_' + queue, Date.now());
+}
+function clearPrinting(queue) { localStorage.removeItem('ps_' + queue); }
+function isStuck(queue) {
+  const t = localStorage.getItem('ps_' + queue);
+  return t && (Date.now() - parseInt(t, 10)) > STUCK_MS;
 }
 
 function loadStatus() {
@@ -151,40 +161,51 @@ function loadStatus() {
         document.getElementById('status-summary').textContent = 'Status unavailable';
         return;
       }
-      const statuses  = data.statuses;
-      let idle = 0, printing = 0, disabled = 0, unknown = 0;
+      const statuses = data.statuses;
+      let idle = 0, printing = 0, stuck = 0, disabled = 0, unknown = 0;
 
       const hasAny = Object.keys(statuses).length > 0;
       document.querySelectorAll('.printer-row').forEach(row => {
-        const queue  = row.dataset.queue;
-        const st     = statuses[queue] || (hasAny ? 'unknown' : 'nodata');
-        const info   = STATUS_LABELS[st] || STATUS_LABELS.unknown;
-        const badge  = document.getElementById(safeId(queue));
+        const queue = row.dataset.queue;
+        let st = statuses[queue] || (hasAny ? 'unknown' : 'nodata');
+
+        // Stuck detection: still "printing" after 5 minutes → likely jammed
+        if (st === 'printing') {
+          markPrinting(queue);
+          if (isStuck(queue)) st = 'stuck';
+        } else {
+          clearPrinting(queue);
+        }
+
+        const info  = STATUS_LABELS[st] || STATUS_LABELS.unknown;
+        const badge = document.getElementById(safeId(queue));
         if (badge) { badge.textContent = info.text; badge.className = 'status-dot ' + info.cls; }
         row.dataset.status = st;
 
-        // Move disabled rows visually to top
-        row.classList.remove('row-idle','row-printing','row-disabled','row-unknown');
-        row.classList.add(st === 'idle' ? 'row-idle' : st === 'printing' ? 'row-printing' : st === 'disabled' ? 'row-disabled' : 'row-unknown');
+        row.classList.remove('row-idle','row-printing','row-stuck','row-disabled','row-unknown');
+        const rowCls = { idle:'row-idle', printing:'row-printing', stuck:'row-stuck', disabled:'row-disabled' };
+        row.classList.add(rowCls[st] || 'row-unknown');
 
-        if (st === 'idle')          idle++;
+        if      (st === 'idle')     idle++;
+        else if (st === 'stuck')    stuck++;
         else if (st === 'printing') printing++;
         else if (st === 'disabled') disabled++;
         else                        unknown++;
       });
 
-      // Sort: disabled first, then unknown, then printing, then idle
+      // Sort: down → stuck → unknown → printing → ready
       const tbody = document.getElementById('printer-tbody');
       const rows  = Array.from(tbody.querySelectorAll('tr'));
-      const order = { disabled: 0, unknown: 1, printing: 2, idle: 3 };
-      rows.sort((a, b) => (order[a.dataset.status] ?? 4) - (order[b.dataset.status] ?? 4));
+      const order = { disabled: 0, stuck: 1, unknown: 2, printing: 3, idle: 4 };
+      rows.sort((a, b) => (order[a.dataset.status] ?? 5) - (order[b.dataset.status] ?? 5));
       rows.forEach(r => tbody.appendChild(r));
 
       document.getElementById('status-summary').innerHTML =
-        `<span class="st-idle">&#9679; ${idle} idle</span>  ` +
+        `<span class="st-idle">&#9679; ${idle} ready</span>  ` +
         `<span class="st-printing">&#9679; ${printing} printing</span>  ` +
-        (disabled ? `<span class="st-disabled">&#9679; ${disabled} disabled</span>  ` : '') +
-        (unknown  ? `<span class="st-unknown">&#9679; ${unknown} unknown</span>`  : '');
+        (stuck    ? `<span class="st-stuck">&#9679; ${stuck} stuck (&gt;5 min)</span>  ` : '') +
+        (disabled ? `<span class="st-disabled">&#9679; ${disabled} down</span>  ` : '') +
+        (unknown  ? `<span class="st-unknown">&#9679; ${unknown} unknown</span>` : '');
     })
     .catch(() => { document.getElementById('status-summary').textContent = 'Status unavailable'; });
 }

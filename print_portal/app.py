@@ -175,14 +175,12 @@ def api_status():
     if not printers:
         return jsonify({"success": True, "statuses": {}})
 
-    # Build one SSH call: shell for-loop runs lpstat -a per queue,
-    # prints "QUEUENAME STATUS" so full names are preserved.
-    # lpstat -a QUEUE output row 3: columns are Queue Dev Status ...
-    # awk 'NR==3{print $3}' extracts the Status field (READY/DOWN/BUSY/etc.)
+    # AIX lpstat: flag and queue name joined without space: lpstat -aQUEUE
+    # Output: row1=header, row2=dashes, row3=data; col3=Status (READY/DOWN/RUNNING…)
     queue_list = " ".join(p["queue"] for p in printers)
     cmd = (
         "for q in " + queue_list + "; do "
-        "s=$(lpstat -a $q 2>/dev/null | awk 'NR==3{print $3}'); "
+        "s=$(lpstat -a$q 2>/dev/null | awk 'NR==3{print $3}'); "
         "printf '%s %s\\n' \"$q\" \"$s\"; "
         "done"
     )
@@ -230,7 +228,7 @@ def api_action():
     # ── check queue ──
     if action == "check":
         cmd = (
-            f"echo '=== Queue Status ==='; lpstat -a 2>&1 | grep -i '{queue}'; "
+            f"echo '=== Queue Status ==='; lpstat -a{queue} 2>&1; "
             f"echo; echo '=== Active Jobs ==='; lpstat -o {queue} 2>&1"
         )
         out, err, ok = ssh_run(cmd)
