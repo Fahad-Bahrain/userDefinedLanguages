@@ -13,9 +13,22 @@ AIX_USER = "printm"
 AIX_PASS = "printm"
 AIX_PORT = 22
 
+# Script lives in C:\AIX_Monitor\print_portal\
+# Excel lives one level up at C:\AIX_Monitor\Oracle_printers.xlsx
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-EXCEL_FILE = os.path.join(BASE_DIR, "Oracle_Printers.xlsx")
+PARENT_DIR = os.path.dirname(BASE_DIR)
 USERS_FILE = os.path.join(BASE_DIR, "users.json")
+
+# Locate Excel: check own folder first, then parent (C:\AIX_Monitor\)
+def _find_excel():
+    for folder in (BASE_DIR, PARENT_DIR):
+        for name in ("Oracle_printers.xlsx", "Oracle_Printers.xlsx"):
+            p = os.path.join(folder, name)
+            if os.path.exists(p):
+                return p
+    return os.path.join(PARENT_DIR, "Oracle_printers.xlsx")  # fallback path for error message
+
+EXCEL_FILE = _find_excel()
 
 
 # ── Data helpers ──────────────────────────────────────────────────────────────

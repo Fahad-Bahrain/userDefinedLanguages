@@ -6,6 +6,9 @@ echo   EKK Oracle Print Portal
 echo =====================================================
 echo.
 
+:: Change to this script's directory (C:\AIX_Monitor\print_portal\)
+cd /d "%~dp0"
+
 :: Check Python is available
 python --version >nul 2>&1
 if errorlevel 1 (
@@ -22,6 +25,7 @@ if errorlevel 1 (
 )
 
 echo.
+echo  Excel file  : C:\AIX_Monitor\Oracle_printers.xlsx
 echo  Open in browser: http://localhost:5000
 echo  Press Ctrl+C to stop.
 echo.

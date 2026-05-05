@@ -1,39 +1,52 @@
 EKK Oracle Print Queue Portal — Setup Guide
 ============================================
 
-REQUIREMENTS
-------------
-- Windows PC with Python 3.10+ installed
-- Network access to ekkhp01a (SSH port 22)
-- Oracle_Printers.xlsx in this folder
+FOLDER STRUCTURE
+----------------
+C:\AIX_Monitor\
+├── Oracle_printers.xlsx        ← already here (used by the portal)
+├── sample-print                ← already here
+├── sample-pdf.ps               ← already here
+└── print_portal\               ← copy this folder here
+    ├── app.py
+    ├── users.json
+    ├── requirements.txt
+    ├── run.bat
+    ├── SETUP.txt
+    ├── templates\
+    │   ├── login.html
+    │   └── dashboard.html
+    └── static\
+        └── style.css
 
 FIRST-TIME SETUP
 ----------------
-1. Copy Oracle_Printers.xlsx into this folder (print_portal\)
-   Required columns:
-     - "IP Address"         — printer IP address
-     - "Printer Queue Name" — AIX queue name (e.g. TP_TPL_HP4350)
+1. Copy the print_portal\ folder into C:\AIX_Monitor\
 
-2. Double-click run.bat  (or: python app.py)
-   - Dependencies install automatically on first run
+2. Double-click  C:\AIX_Monitor\print_portal\run.bat
+   - Python packages install automatically on first run
+   - Oracle_printers.xlsx is found automatically in C:\AIX_Monitor\
 
 3. Open browser: http://localhost:5000
+
+NOTE: Oracle_printers.xlsx stays in C:\AIX_Monitor\ — no need to copy it.
+      The app looks in its own folder first, then the parent folder.
 
 NETWORK ACCESS FOR OTHER PCS (optional)
 -----------------------------------------
 - Open Windows Firewall for TCP port 5000 on this PC
-- Other PCs access via: http://<your-pc-ip>:5000
+- Other PCs on the network: http://<your-pc-ip>:5000
 
 USER ACCOUNTS (edit users.json to change passwords)
 ----------------------------------------------------
-Username  | Password     | Access
-----------|--------------|----------------------------------
-ict       | ict@2024     | ALL printers (admin)
-anoop     | Anoop@123    | TP_* queues
-rakesh    | Rakesh@123   | TP_* queues
-vipin     | Vipin@123    | KP_*, KPS_*, KPC_* queues
-vimala    | Vimala@123   | MCP_*, MCS_*, MCSR_* queues
-azzat     | Azzat@123    | TSC_*, TBSC_*, KBSC_* queues
+Username       | Password      | Access
+---------------|---------------|------------------------------------------
+ict            | ictprt@2026   | ALL printers (admin)
+anoop / rakesh | Anoop@123     | TSC_TPL*, TBSC_TPL*, TSC_SITRA*, TP_SITRA*
+               | Rakesh@123    | (Toyota Plaza + Sitra locations)
+vipin          | Vipin@123     | TP_*, KP_*, KPS_*, KPC_*
+vimala         | Vimala@123    | MCP_*, MCS_*, MCSR_*
+azzat          | Azzat@123     | TSC_ARAD*, TBSC_ARAD*, KBSC_ARAD* (Arad)
 
 ADDING A NEW USER
 -----------------
@@ -44,18 +57,18 @@ Edit users.json and add:
     "role": "user",
     "prefixes": ["XX_"]
   }
+No restart needed — users.json is read on every login.
 
-ADDING A NEW DIVISION
----------------------
-Add the new user's queue prefixes to users.json "prefixes" list.
-Add new printers to Oracle_Printers.xlsx and restart the app.
+ADDING A NEW DIVISION / QUEUE PREFIX
+--------------------------------------
+Add new prefixes to the user's "prefixes" list in users.json.
+Add new printers to Oracle_printers.xlsx (no restart needed).
 
 AIX CONNECTION
 --------------
 Server : ekkhp01a
 User   : printm
 Port   : 22
-
 Configured in app.py (AIX_HOST, AIX_USER, AIX_PASS constants).
 
 ACTIONS EXPLAINED
@@ -63,15 +76,15 @@ ACTIONS EXPLAINED
 Check Queue   — Shows all current print jobs (lpstat -o <queue>)
 Cancel All    — Cancels every job in the queue
 Cancel Job    — Cancels one specific job by job ID
-Ping          — Pings the printer's IP from the AIX server
+Ping          — Pings the printer IP from the AIX server
 Enable        — Enables the queue (enable <queue>)
 Disable       — Disables the queue (disable <queue>)
-Print Test    — Sends /home/sample-print to the queue (lp -d)
-View Log      — Shows tail of queue log or qdaemon log
+Print Test    — Sends /home/sample-print to the queue via lp -d
+View Log      — Shows tail of queue spool log or qdaemon log
 
 TROUBLESHOOTING
 ---------------
-- "Oracle_Printers.xlsx not found"  → copy the Excel file here
-- SSH timeout errors                → check network path to ekkhp01a port 22
-- "No printers assigned"            → check prefixes in users.json match queue names
-- Port 5000 already in use          → change port in app.py last line
+- "Oracle_printers.xlsx not found"  → confirm file exists in C:\AIX_Monitor\
+- SSH timeout / connection errors   → check network path to ekkhp01a port 22
+- "No printers assigned"            → check prefixes in users.json match queue names in Excel
+- Port 5000 already in use          → change port number at bottom of app.py
