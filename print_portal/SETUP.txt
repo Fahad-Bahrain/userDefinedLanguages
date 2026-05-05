@@ -1,0 +1,77 @@
+EKK Oracle Print Queue Portal — Setup Guide
+============================================
+
+REQUIREMENTS
+------------
+- Windows PC with Python 3.10+ installed
+- Network access to ekkhp01a (SSH port 22)
+- Oracle_Printers.xlsx in this folder
+
+FIRST-TIME SETUP
+----------------
+1. Copy Oracle_Printers.xlsx into this folder (print_portal\)
+   Required columns:
+     - "IP Address"         — printer IP address
+     - "Printer Queue Name" — AIX queue name (e.g. TP_TPL_HP4350)
+
+2. Double-click run.bat  (or: python app.py)
+   - Dependencies install automatically on first run
+
+3. Open browser: http://localhost:5000
+
+NETWORK ACCESS FOR OTHER PCS (optional)
+-----------------------------------------
+- Open Windows Firewall for TCP port 5000 on this PC
+- Other PCs access via: http://<your-pc-ip>:5000
+
+USER ACCOUNTS (edit users.json to change passwords)
+----------------------------------------------------
+Username  | Password     | Access
+----------|--------------|----------------------------------
+ict       | ict@2024     | ALL printers (admin)
+anoop     | Anoop@123    | TP_* queues
+rakesh    | Rakesh@123   | TP_* queues
+vipin     | Vipin@123    | KP_*, KPS_*, KPC_* queues
+vimala    | Vimala@123   | MCP_*, MCS_*, MCSR_* queues
+azzat     | Azzat@123    | TSC_*, TBSC_*, KBSC_* queues
+
+ADDING A NEW USER
+-----------------
+Edit users.json and add:
+  "newuser": {
+    "password": "NewUser@123",
+    "name": "Display Name",
+    "role": "user",
+    "prefixes": ["XX_"]
+  }
+
+ADDING A NEW DIVISION
+---------------------
+Add the new user's queue prefixes to users.json "prefixes" list.
+Add new printers to Oracle_Printers.xlsx and restart the app.
+
+AIX CONNECTION
+--------------
+Server : ekkhp01a
+User   : printm
+Port   : 22
+
+Configured in app.py (AIX_HOST, AIX_USER, AIX_PASS constants).
+
+ACTIONS EXPLAINED
+-----------------
+Check Queue   — Shows all current print jobs (lpstat -o <queue>)
+Cancel All    — Cancels every job in the queue
+Cancel Job    — Cancels one specific job by job ID
+Ping          — Pings the printer's IP from the AIX server
+Enable        — Enables the queue (enable <queue>)
+Disable       — Disables the queue (disable <queue>)
+Print Test    — Sends /home/sample-print to the queue (lp -d)
+View Log      — Shows tail of queue log or qdaemon log
+
+TROUBLESHOOTING
+---------------
+- "Oracle_Printers.xlsx not found"  → copy the Excel file here
+- SSH timeout errors                → check network path to ekkhp01a port 22
+- "No printers assigned"            → check prefixes in users.json match queue names
+- Port 5000 already in use          → change port in app.py last line
