@@ -16,8 +16,10 @@
 
     <!-- Blue header section -->
     <div class="card-header">
-      <img src="/logo" alt="Ekkanoo" class="login-ekk-logo"
-           onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'logo-circle',textContent:'EKK'}))">
+      <div class="logo-box">
+        <img src="/logo" alt="Ekkanoo" class="login-ekk-logo"
+             onerror="this.parentElement.replaceWith(Object.assign(document.createElement('div'),{className:'logo-circle',textContent:'EKK'}))">
+      </div>
       <h1>Oracle Print Portal</h1>
       <p class="subtitle">Printer Queue Management</p>
     </div>

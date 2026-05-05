@@ -18,11 +18,11 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 6vh;
+  padding-top: 8vh;
   background: #0d1f33;
 }
 
-/* Toyota Plaza — card floats above building roofline */
+/* Toyota Plaza background */
 .login-bg {
   position: fixed; inset: 0; z-index: 0;
   background: url('/bg') center 25% / cover no-repeat;
@@ -33,13 +33,14 @@ body {
 .login-page::after {
   content: '';
   position: fixed; inset: 0; z-index: 0;
-  background: rgba(6, 16, 34, 0.22);
+  background: rgba(6, 16, 34, 0.20);
   pointer-events: none;
 }
 
 .login-wrap {
   position: relative; z-index: 1;
-  width: 100%; max-width: 430px;
+  width: 100%; max-width: 400px;
+  margin: 0 auto;
   padding: 0 16px;
 }
 
@@ -53,35 +54,43 @@ body {
 /* Blue header panel */
 .card-header {
   background: linear-gradient(175deg, #3a6fa8 0%, #1e4880 100%);
-  padding: 24px 28px 20px;
+  padding: 22px 28px 18px;
   text-align: center;
 }
 
+/* White box around logo */
+.logo-box {
+  display: inline-block;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 16px;
+  margin-bottom: 10px;
+}
+
 .login-ekk-logo {
-  height: 50px; width: auto;
-  display: block; margin: 0 auto 10px;
+  height: 36px; width: auto;
+  display: block;
   object-fit: contain;
 }
 
 .logo-circle {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 52px; height: 52px; border-radius: 50%;
+  width: 44px; height: 44px; border-radius: 50%;
   background: rgba(255,255,255,.2); color: #fff;
-  font-size: 18px; font-weight: 700; margin-bottom: 10px;
+  font-size: 16px; font-weight: 700; margin-bottom: 10px;
 }
 
-.card-header h1 { font-size: 20px; color: #fff; font-weight: 700; margin-bottom: 4px; }
-.subtitle       { font-size: 12.5px; color: #c0392b; font-weight: 700;
+.card-header h1 { font-size: 19px; color: #fff; font-weight: 700; margin-bottom: 5px; }
+.subtitle       { font-size: 12px; color: #c0392b; font-weight: 700;
                   background: #fff; display: inline-block;
-                  padding: 2px 12px; border-radius: 10px; margin-top: 2px; }
+                  padding: 2px 12px; border-radius: 10px; }
 
 /* Light form panel */
 .card-body {
   background: #eef2f7;
-  padding: 20px 24px 18px;
+  padding: 18px 22px 16px;
 }
 
-/* Label + input in one row */
 .field-row {
   display: flex;
   align-items: stretch;
@@ -98,13 +107,13 @@ body {
   font-weight: 600;
   padding: 10px 14px;
   white-space: nowrap;
-  min-width: 90px;
+  min-width: 88px;
   display: flex; align-items: center; justify-content: center;
 }
 
 .field-row input {
   flex: 1;
-  padding: 10px 13px;
+  padding: 10px 12px;
   border: 1px solid #ccd3de;
   border-left: none;
   font-size: 13.5px;
@@ -123,7 +132,7 @@ body {
 }
 .btn-login:hover { background: #0d47a1; }
 
-.login-footer { text-align: center; margin-top: 14px; color: #8b1a1a; font-size: 12px; font-weight: 600; }
+.login-footer { text-align: center; margin-top: 13px; color: #8b1a1a; font-size: 12px; font-weight: 600; }
 
 .login-footer { text-align: center; margin-top: 22px; color: #8b1a1a; font-size: 12px; font-weight: 600; }
 
