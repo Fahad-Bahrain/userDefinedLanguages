@@ -13,29 +13,45 @@ body {
 
 /* ── Login Page ── */
 .login-page {
-  background: linear-gradient(135deg, #1a3a5c 0%, #1565c0 100%);
+  position: relative;
   min-height: 100vh;
   display: flex; align-items: center; justify-content: center;
+  background: #0d1f33;
 }
 
-.login-wrap  { width: 100%; max-width: 420px; padding: 16px; }
+/* Toyota Plaza background image at 30% opacity (70% watermark) */
+.login-bg {
+  position: fixed; inset: 0; z-index: 0;
+  background: url('/bg') center / cover no-repeat;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.login-wrap {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 420px; padding: 16px;
+}
 
 .login-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 40px 36px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.25);
+  background: rgba(255,255,255,0.97);
+  border-radius: 14px;
+  padding: 36px 36px 28px;
+  box-shadow: 0 12px 48px rgba(0,0,0,.45);
 }
 
-.login-logo { text-align: center; margin-bottom: 28px; }
+.login-logo { text-align: center; margin-bottom: 24px; }
 
-.login-logo img { height: 64px; margin-bottom: 12px; display: block; margin-left: auto; margin-right: auto; }
+.login-ekk-logo {
+  height: 72px; width: auto;
+  display: block; margin: 0 auto 14px;
+  object-fit: contain;
+}
 
 .logo-circle {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 64px; height: 64px; border-radius: 50%;
+  width: 72px; height: 72px; border-radius: 50%;
   background: #1565c0; color: #fff;
-  font-size: 20px; font-weight: 700; margin-bottom: 12px;
+  font-size: 22px; font-weight: 700; margin-bottom: 14px;
 }
 
 .login-logo h1  { font-size: 22px; color: #1a3a5c; font-weight: 700; }
@@ -59,7 +75,7 @@ body {
 }
 .btn-login:hover { background: #0d47a1; }
 
-.login-footer { text-align: center; margin-top: 24px; color: #aaa; font-size: 12px; }
+.login-footer { text-align: center; margin-top: 22px; color: #aaa; font-size: 12px; }
 
 /* ── Alerts ── */
 .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
@@ -241,11 +257,15 @@ pre#modal-output {
 
 /* ── Footer ── */
 .app-footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
   text-align: center;
-  padding: 10px;
+  padding: 7px 16px;
   font-size: 12px;
   color: #888;
   border-top: 1px solid #dde3ea;
   background: #fff;
-  flex-shrink: 0;
+  z-index: 200;
 }
+
+/* Prevent table rows from hiding behind pinned footer */
+.main-content { padding-bottom: 40px; }

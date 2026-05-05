@@ -85,8 +85,6 @@
             <button class="btn-action btn-disable" onclick="doAction('disable',      '{{ p.queue }}','{{ p.ip }}')">Disable</button>
             <button class="btn-action btn-print"   onclick="doAction('print_text',   '{{ p.queue }}','{{ p.ip }}')">Print Text</button>
             <button class="btn-action btn-pdf"     onclick="doAction('print_pdf',    '{{ p.queue }}','{{ p.ip }}')">Print PDF</button>
-            <button class="btn-action btn-log"     onclick="doAction('log',          '{{ p.queue }}','{{ p.ip }}')">View Log</button>
-            <button class="btn-action btn-ssh"     onclick="doAction('test_ssh',     '{{ p.queue }}','{{ p.ip }}')">Test SSH</button>
           </td>
         </tr>
         {% endfor %}

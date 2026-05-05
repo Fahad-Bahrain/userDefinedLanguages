@@ -102,6 +102,14 @@ def serve_logo():
     return "", 404
 
 
+@app.route("/bg")
+def serve_bg():
+    p = _find_file("Toyota Plaza.jpg", "Toyota_Plaza.jpg", "toyota_plaza.jpg")
+    if p:
+        return send_file(p, mimetype="image/jpeg")
+    return "", 404
+
+
 @app.route("/favicon.ico")
 def favicon():
     p = _find_file("ekkanoo_logo.ico", "erp_ekk.ico")
