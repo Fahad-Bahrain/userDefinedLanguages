@@ -160,39 +160,46 @@ def api_status():
     if "username" not in session:
         return jsonify({"success": False, "statuses": {}}), 401
 
-    # Run two commands in one SSH call:
-    # lpstat -a  → accepting/not-accepting (enabled vs disabled)
-    # lpstat -o  → currently printing jobs
-    out, err, ok = ssh_run("lpstat -a 2>&1; echo '===JOBS==='; lpstat -o 2>&1", timeout=30)
+    # Only check queues this user can see
+    users     = load_users()
+    user_data = users.get(session["username"], {})
+    printers  = filter_printers(load_printers(), user_data)
+    if not printers:
+        return jsonify({"success": True, "statuses": {}})
+
+    # Build one SSH call: shell for-loop runs lpstat -a per queue,
+    # prints "QUEUENAME STATUS" so full names are preserved.
+    # lpstat -a QUEUE output row 3: columns are Queue Dev Status ...
+    # awk 'NR==3{print $3}' extracts the Status field (READY/DOWN/BUSY/etc.)
+    queue_list = " ".join(p["queue"] for p in printers)
+    cmd = (
+        "for q in " + queue_list + "; do "
+        "s=$(lpstat -a $q 2>/dev/null | awk 'NR==3{print $3}'); "
+        "printf '%s %s\\n' \"$q\" \"$s\"; "
+        "done"
+    )
+
+    out, err, ok = ssh_run(cmd, timeout=60)
     if not ok:
         return jsonify({"success": False, "statuses": {}, "error": err})
 
+    # AIX status words → our status keys
+    STATUS_MAP = {
+        "READY":   "idle",
+        "DOWN":    "disabled",
+        "BUSY":    "printing",
+        "RUNNING": "printing",
+        "WAITING": "idle",
+        "HELD":    "disabled",
+    }
+
     statuses = {}
-
-    # Split at the marker
-    parts     = out.split("===JOBS===")
-    accept_section = parts[0] if len(parts) > 0 else ""
-    jobs_section   = parts[1] if len(parts) > 1 else ""
-
-    # Parse lpstat -a lines:
-    #   queue_name accepting requests since ...
-    #   queue_name not accepting requests since ...
-    for line in accept_section.splitlines():
-        line = line.strip()
-        m = re.match(r"(\S+)\s+(not\s+)?accepting\s+requests", line, re.IGNORECASE)
-        if m:
-            qname    = m.group(1)
-            disabled = bool(m.group(2))
-            statuses[qname] = "disabled" if disabled else "idle"
-
-    # Upgrade idle → printing if there's an active job line
-    #   queue_name-JOBID  user  size  date
-    for line in jobs_section.splitlines():
-        m = re.match(r"(\S+)-\d+\s+", line.strip())
-        if m:
-            qname = m.group(1)
-            if qname in statuses:
-                statuses[qname] = "printing"
+    for line in out.splitlines():
+        parts = line.strip().split()
+        if len(parts) >= 2:
+            statuses[parts[0]] = STATUS_MAP.get(parts[1].upper(), "unknown")
+        elif len(parts) == 1:
+            statuses[parts[0]] = "unknown"
 
     return jsonify({"success": True, "statuses": statuses})
 
