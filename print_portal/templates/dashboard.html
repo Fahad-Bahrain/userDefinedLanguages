@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EKK Print Portal</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -11,8 +12,8 @@
 <!-- ── Top Nav ── -->
 <nav class="topnav">
   <div class="nav-brand">
-    <span class="brand-badge">EKK</span>
-    Oracle Print Portal
+    <img src="/logo" alt="EKK" class="nav-logo" onerror="this.style.display='none'">
+    <span class="brand-title">Oracle Print Portal</span>
   </div>
   <div class="nav-user">
     <span class="user-name">{{ user.name }}</span>
@@ -26,47 +27,66 @@
 
   {% if no_excel %}
   <div class="alert alert-warn">
-    <strong>Oracle_Printers.xlsx not found.</strong>
-    Place the Excel file in the same folder as app.py and restart.
+    <strong>Oracle_printers.xlsx not found.</strong>
+    Place it in <code>C:\AIX_Monitor\</code> and refresh.
   </div>
+
   {% elif not printers %}
   <div class="alert alert-warn">
     No printers assigned to your account. Contact ICT.
   </div>
+
   {% else %}
 
   <div class="section-header">
-    <h2>Printer Queues
-      <span class="printer-count">{{ printers|length }} queue{{ 's' if printers|length != 1 }}</span>
-    </h2>
-    <p class="section-sub">Click any action to manage the printer queue on <strong>ekkhp01a</strong>.</p>
+    <div>
+      <h2>Printer Queues <span class="printer-count" id="total-count">{{ printers|length }} queue{{ 's' if printers|length != 1 }}</span></h2>
+      <p class="section-sub">
+        Server: <strong>{{ user.name }}</strong> &mdash;
+        <span id="status-summary">Loading status&hellip;</span>
+        &nbsp;<button class="btn-refresh" onclick="loadStatus()">&#8635; Refresh</button>
+      </p>
+    </div>
+    <div class="filter-row">
+      <select id="queue-select" onchange="filterBySelect()">
+        <option value="">— All queues ({{ printers|length }}) —</option>
+        {% for p in printers %}
+        <option value="{{ p.queue }}">{{ p.queue }}{% if p.ip %} &nbsp;({{ p.ip }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <input type="search" id="filter-input" placeholder="&#128269; or type to search&hellip;" oninput="filterTable()">
+    </div>
   </div>
 
   <div class="table-wrap">
-    <table class="printer-table">
+    <table class="printer-table" id="printer-table">
       <thead>
         <tr>
           <th>#</th>
           <th>Queue Name</th>
           <th>IP Address</th>
+          <th>Status</th>
           <th class="actions-col">Actions</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="printer-tbody">
         {% for p in printers %}
-        <tr data-queue="{{ p.queue }}" data-ip="{{ p.ip }}">
+        <tr class="printer-row" data-queue="{{ p.queue }}" data-ip="{{ p.ip }}" data-status="unknown">
           <td class="row-num">{{ loop.index }}</td>
           <td class="queue-name">{{ p.queue }}</td>
           <td class="ip-addr">{{ p.ip }}</td>
+          <td><span class="status-dot" id="st-{{ p.queue|replace('_','-') }}">&#9679; &hellip;</span></td>
           <td class="actions-cell">
-            <button class="btn-action btn-check"      onclick="doAction('check',      '{{ p.queue }}', '{{ p.ip }}')">Check Queue</button>
-            <button class="btn-action btn-cancel"     onclick="doAction('cancel_all', '{{ p.queue }}', '{{ p.ip }}')">Cancel All</button>
-            <button class="btn-action btn-job"        onclick="promptCancelJob('{{ p.queue }}')">Cancel Job</button>
-            <button class="btn-action btn-ping"       onclick="doAction('ping',       '{{ p.queue }}', '{{ p.ip }}')">Ping</button>
-            <button class="btn-action btn-enable"     onclick="doAction('enable',     '{{ p.queue }}', '{{ p.ip }}')">Enable</button>
-            <button class="btn-action btn-disable"    onclick="doAction('disable',    '{{ p.queue }}', '{{ p.ip }}')">Disable</button>
-            <button class="btn-action btn-print"      onclick="doAction('print_test', '{{ p.queue }}', '{{ p.ip }}')">Print Test</button>
-            <button class="btn-action btn-log"        onclick="doAction('log',        '{{ p.queue }}', '{{ p.ip }}')">View Log</button>
+            <button class="btn-action btn-check"   onclick="doAction('check',        '{{ p.queue }}','{{ p.ip }}')">Check Queue</button>
+            <button class="btn-action btn-cancel1" onclick="doAction('cancel_first', '{{ p.queue }}','{{ p.ip }}')">Cancel 1st</button>
+            <button class="btn-action btn-cancel"  onclick="doAction('cancel_all',   '{{ p.queue }}','{{ p.ip }}')">Cancel All</button>
+            <button class="btn-action btn-ping"    onclick="doAction('ping',         '{{ p.queue }}','{{ p.ip }}')">Ping</button>
+            <button class="btn-action btn-enable"  onclick="doAction('enable',       '{{ p.queue }}','{{ p.ip }}')">Enable</button>
+            <button class="btn-action btn-disable" onclick="doAction('disable',      '{{ p.queue }}','{{ p.ip }}')">Disable</button>
+            <button class="btn-action btn-print"   onclick="doAction('print_text',   '{{ p.queue }}','{{ p.ip }}')">Print Text</button>
+            <button class="btn-action btn-pdf"     onclick="doAction('print_pdf',    '{{ p.queue }}','{{ p.ip }}')">Print PDF</button>
+            <button class="btn-action btn-log"     onclick="doAction('log',          '{{ p.queue }}','{{ p.ip }}')">View Log</button>
+            <button class="btn-action btn-ssh"     onclick="doAction('test_ssh',     '{{ p.queue }}','{{ p.ip }}')">Test SSH</button>
           </td>
         </tr>
         {% endfor %}
@@ -76,6 +96,11 @@
 
   {% endif %}
 </div>
+
+<!-- ── Footer ── -->
+<footer class="app-footer">
+  &copy; Ebrahim K. Kanoo &mdash; Bahrain &ndash; IT Department &nbsp;|&nbsp; {{ version }}
+</footer>
 
 <!-- ── Result Modal ── -->
 <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
@@ -88,15 +113,6 @@
       <div id="modal-spinner" class="spinner hidden"></div>
       <pre id="modal-output"></pre>
     </div>
-    <!-- Cancel-job sub-form (hidden by default) -->
-    <div id="cancel-job-form" class="cancel-job-form hidden">
-      <label>Job ID to cancel:</label>
-      <div class="cancel-job-row">
-        <input type="text" id="job-id-input" placeholder="e.g. 123" maxlength="10">
-        <button class="btn-action btn-cancel" id="cancel-job-btn">Cancel Job</button>
-      </div>
-      <div id="job-list"></div>
-    </div>
     <div class="modal-footer">
       <button class="btn-modal-close" onclick="closeModal()">Close</button>
     </div>
@@ -104,110 +120,141 @@
 </div>
 
 <script>
-let currentQueue = '';
-let currentIP    = '';
+// ── Status loading ────────────────────────────────────────────────────────
+const STATUS_LABELS = {
+  idle:     { text: '● Idle',     cls: 'st-idle'     },
+  printing: { text: '● Printing', cls: 'st-printing' },
+  disabled: { text: '● Disabled', cls: 'st-disabled' },
+  unknown:  { text: '● Unknown',  cls: 'st-unknown'  }
+};
+
+function safeId(queue) {
+  return 'st-' + queue.replace(/_/g, '-');
+}
+
+function loadStatus() {
+  document.getElementById('status-summary').textContent = 'Loading status…';
+  fetch('/api/status')
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) {
+        document.getElementById('status-summary').textContent = 'Status unavailable';
+        return;
+      }
+      const statuses  = data.statuses;
+      let idle = 0, printing = 0, disabled = 0, unknown = 0;
+
+      document.querySelectorAll('.printer-row').forEach(row => {
+        const queue  = row.dataset.queue;
+        const st     = statuses[queue] || 'unknown';
+        const info   = STATUS_LABELS[st] || STATUS_LABELS.unknown;
+        const badge  = document.getElementById(safeId(queue));
+        if (badge) { badge.textContent = info.text; badge.className = 'status-dot ' + info.cls; }
+        row.dataset.status = st;
+
+        // Move disabled rows visually to top
+        row.classList.remove('row-idle','row-printing','row-disabled','row-unknown');
+        row.classList.add(st === 'idle' ? 'row-idle' : st === 'printing' ? 'row-printing' : st === 'disabled' ? 'row-disabled' : 'row-unknown');
+
+        if (st === 'idle')          idle++;
+        else if (st === 'printing') printing++;
+        else if (st === 'disabled') disabled++;
+        else                        unknown++;
+      });
+
+      // Sort: disabled first, then unknown, then printing, then idle
+      const tbody = document.getElementById('printer-tbody');
+      const rows  = Array.from(tbody.querySelectorAll('tr'));
+      const order = { disabled: 0, unknown: 1, printing: 2, idle: 3 };
+      rows.sort((a, b) => (order[a.dataset.status] ?? 4) - (order[b.dataset.status] ?? 4));
+      rows.forEach(r => tbody.appendChild(r));
+
+      document.getElementById('status-summary').innerHTML =
+        `<span class="st-idle">&#9679; ${idle} idle</span>  ` +
+        `<span class="st-printing">&#9679; ${printing} printing</span>  ` +
+        (disabled ? `<span class="st-disabled">&#9679; ${disabled} disabled</span>  ` : '') +
+        (unknown  ? `<span class="st-unknown">&#9679; ${unknown} unknown</span>`  : '');
+    })
+    .catch(() => { document.getElementById('status-summary').textContent = 'Status unavailable'; });
+}
+
+// ── Filter ───────────────────────────────────────────────────────────────
+function filterTable() {
+  const q   = document.getElementById('filter-input').value.toLowerCase();
+  const sel = document.getElementById('queue-select');
+  if (sel) sel.value = '';
+  document.querySelectorAll('.printer-row').forEach(row => {
+    const match = !q || row.dataset.queue.toLowerCase().includes(q) || row.dataset.ip.includes(q);
+    row.style.display = match ? '' : 'none';
+  });
+}
+
+function filterBySelect() {
+  const val = document.getElementById('queue-select').value;
+  document.getElementById('filter-input').value = '';
+  document.querySelectorAll('.printer-row').forEach(row => {
+    if (!val) {
+      row.style.display = '';
+    } else {
+      const show = (row.dataset.queue === val);
+      row.style.display = show ? '' : 'none';
+      if (show) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+}
+
+// ── Actions ──────────────────────────────────────────────────────────────
+const ACTION_LABELS = {
+  check:        q => `Check Queue — ${q}`,
+  cancel_first: q => `Cancel First Job — ${q}`,
+  cancel_all:   q => `Cancel All Jobs — ${q}`,
+  ping:         (q, ip) => `Ping Printer — ${ip}`,
+  enable:       q => `Enable Queue — ${q}`,
+  disable:      q => `Disable Queue — ${q}`,
+  print_text:   q => `Print Text Sample — ${q}`,
+  print_pdf:    q => `Print PDF Sample — ${q}`,
+  log:          q => `QDaemon Log — ${q}`,
+  test_ssh:     q => `Test SSH — ekkhp01a`
+};
 
 function openModal(title) {
   document.getElementById('modal-title').textContent  = title;
   document.getElementById('modal-output').textContent = '';
+  document.getElementById('modal-output').className   = '';
   document.getElementById('modal-spinner').classList.remove('hidden');
-  document.getElementById('cancel-job-form').classList.add('hidden');
-  document.getElementById('job-list').innerHTML = '';
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
-function closeModal() {
-  document.getElementById('modal-overlay').classList.add('hidden');
-}
+function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
 
 function showOutput(text, success) {
   document.getElementById('modal-spinner').classList.add('hidden');
   const pre = document.getElementById('modal-output');
-  pre.textContent = text;
+  pre.textContent = text || '(no output)';
   pre.className   = success ? 'output-ok' : 'output-err';
 }
 
 function doAction(action, queue, ip) {
-  currentQueue = queue;
-  currentIP    = ip;
-
-  const labels = {
-    check:      `Check Queue — ${queue}`,
-    cancel_all: `Cancel All Jobs — ${queue}`,
-    ping:       `Ping — ${ip}`,
-    enable:     `Enable Queue — ${queue}`,
-    disable:    `Disable Queue — ${queue}`,
-    print_test: `Print Test — ${queue}`,
-    log:        `QDaemon Log — ${queue}`
-  };
-  openModal(labels[action] || action);
-
+  const label = (ACTION_LABELS[action] || (q => q))(queue, ip);
+  openModal(label);
   fetch('/api/action', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({action, queue, ip})
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ action, queue, ip })
   })
   .then(r => r.json())
   .then(data => {
     showOutput(data.output, data.success);
-    if (action === 'check' && data.jobs && data.jobs.length > 0) {
-      showJobList(data.jobs, queue);
-    }
+    // After enable/disable refresh that row's status
+    if (action === 'enable' || action === 'disable') loadStatus();
   })
   .catch(err => showOutput('Network error: ' + err, false));
 }
 
-function showJobList(jobs, queue) {
-  const div = document.getElementById('job-list');
-  div.innerHTML = '<p class="job-label">Found jobs — click to cancel:</p>';
-  jobs.forEach(j => {
-    const btn = document.createElement('button');
-    btn.className   = 'btn-action btn-cancel job-cancel-btn';
-    btn.textContent = `Cancel ${queue}-${j}`;
-    btn.onclick     = () => cancelJob(queue, j);
-    div.appendChild(btn);
-  });
-}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-function promptCancelJob(queue) {
-  currentQueue = queue;
-  openModal(`Cancel Job — ${queue}`);
-  document.getElementById('modal-spinner').classList.add('hidden');
-  document.getElementById('modal-output').textContent = 'Enter the job ID to cancel:';
-  document.getElementById('cancel-job-form').classList.remove('hidden');
-  document.getElementById('job-id-input').value = '';
-  document.getElementById('job-id-input').focus();
-  document.getElementById('cancel-job-btn').onclick = () => {
-    const jid = document.getElementById('job-id-input').value.trim();
-    if (jid) cancelJob(queue, jid);
-  };
-  document.getElementById('job-id-input').onkeydown = e => {
-    if (e.key === 'Enter') {
-      const jid = document.getElementById('job-id-input').value.trim();
-      if (jid) cancelJob(queue, jid);
-    }
-  };
-}
-
-function cancelJob(queue, jobId) {
-  document.getElementById('cancel-job-form').classList.add('hidden');
-  document.getElementById('modal-spinner').classList.remove('hidden');
-  document.getElementById('modal-output').textContent = '';
-  document.getElementById('modal-title').textContent  = `Cancel Job ${queue}-${jobId}`;
-
-  fetch('/api/action', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({action: 'cancel_job', queue, ip: currentIP, job_id: jobId})
-  })
-  .then(r => r.json())
-  .then(data => showOutput(data.output, data.success))
-  .catch(err => showOutput('Network error: ' + err, false));
-}
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
+// Auto-load status on page ready
+window.addEventListener('load', loadStatus);
 </script>
 
 </body>
