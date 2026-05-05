@@ -227,17 +227,12 @@ def api_action():
 
     # ── check queue ──
     if action == "check":
-        cmd = (
-            f"echo '=== Queue Status ==='; lpstat -a{queue} 2>&1; "
-            f"echo; echo '=== Active Jobs ==='; lpstat -o {queue} 2>&1"
-        )
-        out, err, ok = ssh_run(cmd)
+        out, err, ok = ssh_run(f"lpstat -a{queue} 2>&1")
         if not ok:
             return jsonify({"success": False, "output": err or "SSH connection failed."})
-        jobs = _parse_jobs(out, queue)
         if not out.strip():
-            out = f"No output for '{queue}'. Queue may not exist on the AIX server."
-        return jsonify({"success": True, "output": out, "jobs": jobs})
+            out = f"Queue '{queue}' not found on the AIX server."
+        return jsonify({"success": True, "output": out})
 
     # ── cancel first job ──
     elif action == "cancel_first":
