@@ -160,24 +160,39 @@ def api_status():
     if "username" not in session:
         return jsonify({"success": False, "statuses": {}}), 401
 
-    out, err, ok = ssh_run("lpstat -p 2>&1", timeout=30)
+    # Run two commands in one SSH call:
+    # lpstat -a  → accepting/not-accepting (enabled vs disabled)
+    # lpstat -o  → currently printing jobs
+    out, err, ok = ssh_run("lpstat -a 2>&1; echo '===JOBS==='; lpstat -o 2>&1", timeout=30)
     if not ok:
         return jsonify({"success": False, "statuses": {}, "error": err})
 
     statuses = {}
-    for line in out.splitlines():
-        m = re.match(r"printer\s+(\S+)\s+(.*)", line.strip(), re.IGNORECASE)
+
+    # Split at the marker
+    parts     = out.split("===JOBS===")
+    accept_section = parts[0] if len(parts) > 0 else ""
+    jobs_section   = parts[1] if len(parts) > 1 else ""
+
+    # Parse lpstat -a lines:
+    #   queue_name accepting requests since ...
+    #   queue_name not accepting requests since ...
+    for line in accept_section.splitlines():
+        line = line.strip()
+        m = re.match(r"(\S+)\s+(not\s+)?accepting\s+requests", line, re.IGNORECASE)
+        if m:
+            qname    = m.group(1)
+            disabled = bool(m.group(2))
+            statuses[qname] = "disabled" if disabled else "idle"
+
+    # Upgrade idle → printing if there's an active job line
+    #   queue_name-JOBID  user  size  date
+    for line in jobs_section.splitlines():
+        m = re.match(r"(\S+)-\d+\s+", line.strip())
         if m:
             qname = m.group(1)
-            rest  = m.group(2).lower()
-            if "now printing" in rest:
+            if qname in statuses:
                 statuses[qname] = "printing"
-            elif "is idle" in rest:
-                statuses[qname] = "idle"
-            elif "disabled" in rest:
-                statuses[qname] = "disabled"
-            else:
-                statuses[qname] = "unknown"
 
     return jsonify({"success": True, "statuses": statuses})
 
@@ -199,12 +214,16 @@ def api_action():
 
     # ── check queue ──
     if action == "check":
-        out, err, ok = ssh_run(f"lpstat -p {queue}; echo; lpstat -o {queue}")
+        cmd = (
+            f"echo '=== Queue Status ==='; lpstat -a 2>&1 | grep -i '{queue}'; "
+            f"echo; echo '=== Active Jobs ==='; lpstat -o {queue} 2>&1"
+        )
+        out, err, ok = ssh_run(cmd)
         if not ok:
-            return jsonify({"success": False, "output": err})
+            return jsonify({"success": False, "output": err or "SSH connection failed."})
         jobs = _parse_jobs(out, queue)
         if not out.strip():
-            out = f"Queue '{queue}' — no status returned (queue may not exist on server)."
+            out = f"No output for '{queue}'. Queue may not exist on the AIX server."
         return jsonify({"success": True, "output": out, "jobs": jobs})
 
     # ── cancel first job ──

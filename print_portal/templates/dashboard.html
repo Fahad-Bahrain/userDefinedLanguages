@@ -125,7 +125,8 @@ const STATUS_LABELS = {
   idle:     { text: '● Idle',     cls: 'st-idle'     },
   printing: { text: '● Printing', cls: 'st-printing' },
   disabled: { text: '● Disabled', cls: 'st-disabled' },
-  unknown:  { text: '● Unknown',  cls: 'st-unknown'  }
+  unknown:  { text: '● Unknown',  cls: 'st-unknown'  },
+  nodata:   { text: '—',          cls: 'st-unknown'  }
 };
 
 function safeId(queue) {
@@ -144,9 +145,10 @@ function loadStatus() {
       const statuses  = data.statuses;
       let idle = 0, printing = 0, disabled = 0, unknown = 0;
 
+      const hasAny = Object.keys(statuses).length > 0;
       document.querySelectorAll('.printer-row').forEach(row => {
         const queue  = row.dataset.queue;
-        const st     = statuses[queue] || 'unknown';
+        const st     = statuses[queue] || (hasAny ? 'unknown' : 'nodata');
         const info   = STATUS_LABELS[st] || STATUS_LABELS.unknown;
         const badge  = document.getElementById(safeId(queue));
         if (badge) { badge.textContent = info.text; badge.className = 'status-dot ' + info.cls; }
