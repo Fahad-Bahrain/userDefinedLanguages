@@ -337,10 +337,10 @@ pre#modal-output {
   text-align: center;
   padding: 7px 16px;
   font-size: 12px;
-  color: #8b1a1a;
+  color: #fff;
   font-weight: 600;
-  border-top: 1px solid #dde3ea;
-  background: #fff;
+  background: #1a3a5c;
+  border-top: 3px solid #2e6da4;
   z-index: 200;
 }
 
