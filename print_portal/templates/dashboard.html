@@ -11,21 +11,16 @@
 
 <!-- ── Top Nav ── -->
 <nav class="topnav">
-  <!-- Left: logo -->
   <div class="nav-left">
     <div class="nav-logo-box">
       <img src="/logo" alt="EKK" class="nav-logo"
            onerror="this.parentElement.innerHTML='<span class=\'nav-logo-text\'>EKK</span>'">
     </div>
   </div>
-
-  <!-- Center: title + subtitle -->
   <div class="nav-center">
     <div class="nav-title">Oracle Print Portal</div>
     <div class="nav-subtitle">Printer Queue Management</div>
   </div>
-
-  <!-- Right: user + logout -->
   <div class="nav-right">
     <span class="user-name">{{ user.name }}</span>
     {% if user.role == 'admin' %}<span class="role-badge">Admin</span>{% endif %}
@@ -128,8 +123,24 @@
   </div>
 </div>
 
+<!-- ── Warning Modal ── -->
+<div id="warn-overlay" class="modal-overlay hidden" onclick="closeWarnModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header warn-header">
+      <span id="warn-title">⚠️ Warning</span>
+      <button class="modal-close" onclick="closeWarnModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <pre id="warn-message" class="warn-message"></pre>
+    </div>
+    <div class="modal-footer warn-footer">
+      <button class="btn-modal-close" onclick="closeWarnModal()">Cancel</button>
+      <button class="btn-proceed" id="btn-proceed-anyway">Proceed Anyway</button>
+    </div>
+  </div>
+</div>
+
 <script>
-// ── Status labels ─────────────────────────────────────────────────────
 const STATUS_LABELS = {
   idle:     { text: '● Ready',    cls: 'st-idle'     },
   printing: { text: '● Printing', cls: 'st-printing' },
@@ -140,52 +151,33 @@ const STATUS_LABELS = {
   nodata:   { text: '—',          cls: 'st-unknown'  }
 };
 
-const STUCK_MS = 5 * 60 * 1000; // 5 minutes
+const STUCK_MS = 5 * 60 * 1000;
 
 function safeId(queue) { return 'st-' + queue.replace(/_/g, '-'); }
-
-function markPrinting(queue) {
-  if (!localStorage.getItem('ps_' + queue)) localStorage.setItem('ps_' + queue, Date.now());
-}
+function markPrinting(queue) { if (!localStorage.getItem('ps_' + queue)) localStorage.setItem('ps_' + queue, Date.now()); }
 function clearPrinting(queue) { localStorage.removeItem('ps_' + queue); }
-function isStuck(queue) {
-  const t = localStorage.getItem('ps_' + queue);
-  return t && (Date.now() - parseInt(t, 10)) > STUCK_MS;
-}
+function isStuck(queue) { const t = localStorage.getItem('ps_' + queue); return t && (Date.now() - parseInt(t, 10)) > STUCK_MS; }
 
 function loadStatus() {
   document.getElementById('status-summary').textContent = 'Loading status…';
   fetch('/api/status')
     .then(r => r.json())
     .then(data => {
-      if (!data.success) {
-        document.getElementById('status-summary').textContent = 'Status unavailable';
-        return;
-      }
+      if (!data.success) { document.getElementById('status-summary').textContent = 'Status unavailable'; return; }
       const statuses = data.statuses;
       let idle = 0, printing = 0, stuck = 0, disabled = 0, offline = 0, unknown = 0;
-
       const hasAny = Object.keys(statuses).length > 0;
       document.querySelectorAll('.printer-row').forEach(row => {
         const queue = row.dataset.queue;
         let st = statuses[queue] || (hasAny ? 'unknown' : 'nodata');
-
-        if (st === 'printing') {
-          markPrinting(queue);
-          if (isStuck(queue)) st = 'stuck';
-        } else {
-          clearPrinting(queue);
-        }
-
+        if (st === 'printing') { markPrinting(queue); if (isStuck(queue)) st = 'stuck'; } else { clearPrinting(queue); }
         const info  = STATUS_LABELS[st] || STATUS_LABELS.unknown;
         const badge = document.getElementById(safeId(queue));
         if (badge) { badge.textContent = info.text; badge.className = 'status-dot ' + info.cls; }
         row.dataset.status = st;
-
         row.classList.remove('row-idle','row-printing','row-stuck','row-disabled','row-offline','row-unknown');
         const rowCls = { idle:'row-idle', printing:'row-printing', stuck:'row-stuck', disabled:'row-disabled', offline:'row-offline' };
         row.classList.add(rowCls[st] || 'row-unknown');
-
         if      (st === 'idle')     idle++;
         else if (st === 'printing') printing++;
         else if (st === 'stuck')    stuck++;
@@ -193,14 +185,11 @@ function loadStatus() {
         else if (st === 'offline')  offline++;
         else                        unknown++;
       });
-
-      // Sort: down → offline → stuck → unknown → printing → ready
       const tbody = document.getElementById('printer-tbody');
       const rows  = Array.from(tbody.querySelectorAll('tr'));
       const order = { disabled: 0, offline: 1, stuck: 2, unknown: 3, printing: 4, idle: 5 };
       rows.sort((a, b) => (order[a.dataset.status] ?? 6) - (order[b.dataset.status] ?? 6));
       rows.forEach(r => tbody.appendChild(r));
-
       document.getElementById('status-summary').innerHTML =
         `<span class="st-idle">&#9679; ${idle} ready</span>  ` +
         `<span class="st-printing">&#9679; ${printing} printing</span>  ` +
@@ -212,14 +201,12 @@ function loadStatus() {
     .catch(() => { document.getElementById('status-summary').textContent = 'Status unavailable'; });
 }
 
-// ── Filter ───────────────────────────────────────────────────────────────────
 function filterTable() {
-  const q   = document.getElementById('filter-input').value.toLowerCase();
+  const q = document.getElementById('filter-input').value.toLowerCase();
   const sel = document.getElementById('queue-select');
   if (sel) sel.value = '';
   document.querySelectorAll('.printer-row').forEach(row => {
-    const match = !q || row.dataset.queue.toLowerCase().includes(q) || row.dataset.ip.includes(q);
-    row.style.display = match ? '' : 'none';
+    row.style.display = (!q || row.dataset.queue.toLowerCase().includes(q) || row.dataset.ip.includes(q)) ? '' : 'none';
   });
 }
 
@@ -227,17 +214,11 @@ function filterBySelect() {
   const val = document.getElementById('queue-select').value;
   document.getElementById('filter-input').value = '';
   document.querySelectorAll('.printer-row').forEach(row => {
-    if (!val) {
-      row.style.display = '';
-    } else {
-      const show = (row.dataset.queue === val);
-      row.style.display = show ? '' : 'none';
-      if (show) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    if (!val) { row.style.display = ''; }
+    else { const show = (row.dataset.queue === val); row.style.display = show ? '' : 'none'; if (show) row.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
   });
 }
 
-// ── Actions ──────────────────────────────────────────────────────────────────
 const ACTION_LABELS = {
   check:        q => `Check Queue — ${q}`,
   cancel_first: q => `Cancel First Job — ${q}`,
@@ -256,9 +237,7 @@ function openModal(title) {
   document.getElementById('modal-spinner').classList.remove('hidden');
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
-
 function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
-
 function showOutput(text, success) {
   document.getElementById('modal-spinner').classList.add('hidden');
   const pre = document.getElementById('modal-output');
@@ -266,26 +245,58 @@ function showOutput(text, success) {
   pre.className   = success ? 'output-ok' : 'output-err';
 }
 
-function doAction(action, queue, ip) {
-  const label = (ACTION_LABELS[action] || (q => q))(queue, ip);
-  openModal(label);
-  fetch('/api/action', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ action, queue, ip })
-  })
-  .then(r => r.json())
-  .then(data => {
-    showOutput(data.output, data.success);
-    if (action === 'enable' || action === 'disable') loadStatus();
-  })
-  .catch(err => showOutput('Network error: ' + err, false));
+// ── Printer type helpers
+function isDotMatrix(q) { return /_LD\d/i.test(q) || /_ZD\d/i.test(q); }
+function isLaser(q)     { return /HLps/i.test(q) || /ELps/i.test(q) || /BRps/i.test(q) || /_HL\d/i.test(q) || /_EL\d/i.test(q) || /_BR\d/i.test(q); }
+
+function applyPrintButtonRules() {
+  document.querySelectorAll('.printer-row').forEach(row => {
+    const q      = row.dataset.queue;
+    const txtBtn = row.querySelector('.btn-print');
+    const pdfBtn = row.querySelector('.btn-pdf');
+    if (isLaser(q) && txtBtn)     { txtBtn.disabled = true; txtBtn.title = 'Laser printer — use Print PDF to avoid junk printing'; }
+    if (isDotMatrix(q) && pdfBtn) { pdfBtn.disabled = true; pdfBtn.title = 'Dot-matrix printer — use Print Text'; }
+  });
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+// ── Warning modal
+let _pendingAction = null;
+function closeWarnModal() { _pendingAction = null; document.getElementById('warn-overlay').classList.add('hidden'); }
+function showWarnModal(title, msg, onProceed) {
+  document.getElementById('warn-title').textContent   = title;
+  document.getElementById('warn-message').textContent = msg;
+  document.getElementById('btn-proceed-anyway').onclick = () => { closeWarnModal(); onProceed(); };
+  document.getElementById('warn-overlay').classList.remove('hidden');
+}
+function printWarning(action, queue) {
+  if (action === 'print_text' && isLaser(queue))
+    return { title: '⚠️  Laser Printer — Wrong Print Method',
+             msg: `"${queue}" is a LASER printer.\n\nPrint Text is for dot-matrix printers only (LD / ZD queues).\n\nSending a text job to a laser printer will cause CONTINUOUS JUNK PRINTING that cannot be stopped without powering off the printer.\n\nPlease use "Print PDF" for this printer.` };
+  if (action === 'print_pdf' && isDotMatrix(queue))
+    return { title: '⚠️  Dot-Matrix Printer — Wrong Print Method',
+             msg: `"${queue}" is a DOT-MATRIX printer.\n\nPrint PDF is for laser printers only (HLps / ELps / BRps queues).\n\nPlease use "Print Text" for this printer.` };
+  return null;
+}
 
-// Auto-load on page ready, then refresh every 3 minutes
+// ── Actions
+function doAction(action, queue, ip) {
+  const warn = printWarning(action, queue);
+  if (warn) { showWarnModal(warn.title, warn.msg, () => executeAction(action, queue, ip)); return; }
+  executeAction(action, queue, ip);
+}
+function executeAction(action, queue, ip) {
+  const label = (ACTION_LABELS[action] || (q => q))(queue, ip);
+  openModal(label);
+  fetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, queue, ip }) })
+    .then(r => r.json())
+    .then(data => { showOutput(data.output, data.success); if (action === 'enable' || action === 'disable') loadStatus(); })
+    .catch(err => showOutput('Network error: ' + err, false));
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeWarnModal(); } });
+
 window.addEventListener('load', () => {
+  applyPrintButtonRules();
   loadStatus();
   setInterval(loadStatus, 3 * 60 * 1000);
 });
