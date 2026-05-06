@@ -347,6 +347,18 @@ pre#modal-output {
 /* Prevent table rows from hiding behind pinned footer */
 .main-content { padding-bottom: 40px; }
 
+/* ── Disabled print buttons ── */
+.btn-action:disabled { opacity: 0.30; cursor: not-allowed; filter: grayscale(60%); }
+
+/* ── Warning modal ── */
+.warn-header  { background: #b71c1c; }
+.warn-message { white-space: pre-wrap; font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 13.5px; line-height: 1.65; color: #333; }
+.warn-footer  { display: flex; gap: 10px; justify-content: flex-end; }
+.btn-proceed  { background: #c62828; color: #fff; border: none; border-radius: 4px;
+                padding: 8px 20px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.btn-proceed:hover { background: #b71c1c; }
+
 /* ── Login version (pinned, red) ── */
 .login-version {
   position: fixed; bottom: 0; left: 0; right: 0;
