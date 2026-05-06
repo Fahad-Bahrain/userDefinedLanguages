@@ -291,7 +291,7 @@ function showOutput(text, success) {
 
 // ── Printer type helpers ──────────────────────────────────────────────────
 // Laser  (XL, EL, SL, HL, BR families) — Print PDF only
-function isLaser(q)     { return /XL|EL|SL/i.test(q) || /HLps|BRps/i.test(q) || /_HL\d|_BR\d/i.test(q); }
+function isLaser(q)     { return /XL|EL|SL|ZB/i.test(q) || /HLps|BRps/i.test(q) || /_HL\d|_BR\d/i.test(q); }
 // Dot-matrix (LD, TA, TL families) — Print Text only
 function isDotMatrix(q) { return /_LD|_TA|_TL/i.test(q); }
 // Barcode (ZD family) — both print buttons disabled
