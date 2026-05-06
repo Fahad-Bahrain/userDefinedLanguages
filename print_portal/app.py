@@ -292,29 +292,29 @@ def api_action():
 
     # ── cancel first job ──
     elif action == "cancel_first":
-        out, err, ok = ssh_run(f"lpstat -o {queue}")
+        out, err, ok = ssh_run(f"lpstat -o{queue} 2>/dev/null")
         if not ok:
             return jsonify({"success": False, "output": err})
-        jobs = _parse_jobs(out, queue)
-        if not jobs:
+        if not out.strip():
             return jsonify({"success": True, "output": f"No jobs found in queue {queue}."})
-        first = jobs[0]
-        out2, err2, ok2 = ssh_run(f"cancel {queue}-{first}")
+        # Parse AIX lpstat output: find first RUNNING or QUEUED job number
+        job_id = None
+        for line in out.splitlines():
+            match = re.search(r'(?:RUNNING|QUEUED)\s+(\d+)', line, re.IGNORECASE)
+            if match:
+                job_id = match.group(1)
+                break
+        if not job_id:
+            return jsonify({"success": True, "output": f"No active job found in queue {queue}.\n{out}"})
+        out2, err2, ok2 = ssh_run(f"cancel {job_id} 2>&1")
         return jsonify({"success": ok2,
-                        "output": f"Cancelled first job: {queue}-{first}\n{out2 or err2}"})
+                        "output": f"Cancelled job {job_id} from {queue}.\n{out2 or err2}"})
 
     # ── cancel all jobs ──
     elif action == "cancel_all":
-        out, err, ok = ssh_run(f"lpstat -o {queue}")
-        if not ok:
-            return jsonify({"success": False, "output": err})
-        jobs = _parse_jobs(out, queue)
-        if not jobs:
-            return jsonify({"success": True, "output": f"No jobs in queue {queue}."})
-        cancel_cmd = "; ".join(f"cancel {queue}-{j}" for j in jobs)
-        out2, err2, ok2 = ssh_run(cancel_cmd)
-        return jsonify({"success": ok2,
-                        "output": f"Cancelled {len(jobs)} job(s): {', '.join(jobs)}\n{out2 or err2}"})
+        out, err, ok = ssh_run(f"cancel {queue} 2>&1", timeout=30)
+        return jsonify({"success": ok,
+                        "output": out or err or f"Cancel command sent to queue {queue}."})
 
     # ── ping ──
     elif action == "ping":
