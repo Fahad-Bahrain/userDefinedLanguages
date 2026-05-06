@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EKK Print Portal</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- ── Top Nav ── -->
+<nav class="topnav">
+  <!-- Left: logo -->
+  <div class="nav-left">
+    <div class="nav-logo-box">
+      <img src="/logo" alt="EKK" class="nav-logo"
+           onerror="this.parentElement.innerHTML='<span class=\'nav-logo-text\'>EKK</span>'">
+    </div>
+  </div>
+
+  <!-- Center: title + subtitle -->
+  <div class="nav-center">
+    <div class="nav-title">Oracle Print Portal</div>
+    <div class="nav-subtitle">Printer Queue Management</div>
+  </div>
+
+  <!-- Right: user + logout -->
+  <div class="nav-right">
+    <span class="user-name">{{ user.name }}</span>
+    {% if user.role == 'admin' %}<span class="role-badge">Admin</span>{% endif %}
+    <a href="/logout" class="btn-logout">Logout</a>
+  </div>
+</nav>
+
+<!-- ── Main ── -->
+<div class="main-content">
+
+  {% if no_excel %}
+  <div class="alert alert-warn">
+    <strong>Oracle_printers.xlsx not found.</strong>
+    Place it in <code>C:\AIX_Monitor\</code> and refresh.
+  </div>
+
+  {% elif not printers %}
+  <div class="alert alert-warn">
+    No printers assigned to your account. Contact ICT.
+  </div>
+
+  {% else %}
+
+  <div class="section-header">
+    <div>
+      <h2>Printer Queues <span class="printer-count" id="total-count">{{ printers|length }} queue{{ 's' if printers|length != 1 }}</span></h2>
+      <p class="section-sub">
+        Server: <strong>{{ user.name }}</strong> &mdash;
+        <span id="status-summary">Loading status&hellip;</span>
+        &nbsp;<button class="btn-refresh" onclick="loadStatus()">&#8635; Refresh</button>
+      </p>
+    </div>
+    <div class="filter-row">
+      <select id="queue-select" onchange="filterBySelect()">
+        <option value="">&mdash; All queues ({{ printers|length }}) &mdash;</option>
+        {% for p in printers %}
+        <option value="{{ p.queue }}">{{ p.queue }}{% if p.ip %} &nbsp;({{ p.ip }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <input type="search" id="filter-input" placeholder="&#128269; or type to search&hellip;" oninput="filterTable()">
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="printer-table" id="printer-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Queue Name</th>
+          <th>IP Address</th>
+          <th>Status</th>
+          <th class="actions-col">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="printer-tbody">
+        {% for p in printers %}
+        <tr class="printer-row" data-queue="{{ p.queue }}" data-ip="{{ p.ip }}" data-status="unknown">
+          <td class="row-num">{{ loop.index }}</td>
+          <td class="queue-name">{{ p.queue }}</td>
+          <td class="ip-addr">{{ p.ip }}</td>
+          <td><span class="status-dot" id="st-{{ p.queue|replace('_','-') }}">&#9679; &hellip;</span></td>
+          <td class="actions-cell">
+            <button class="btn-action btn-check"   onclick="doAction('check',        '{{ p.queue }}','{{ p.ip }}')">Check Queue</button>
+            <button class="btn-action btn-cancel1" onclick="doAction('cancel_first', '{{ p.queue }}','{{ p.ip }}')">Cancel 1st</button>
+            <button class="btn-action btn-cancel"  onclick="doAction('cancel_all',   '{{ p.queue }}','{{ p.ip }}')">Cancel All</button>
+            <button class="btn-action btn-ping"    onclick="doAction('ping',         '{{ p.queue }}','{{ p.ip }}')">Ping</button>
+            <button class="btn-action btn-enable"  onclick="doAction('enable',       '{{ p.queue }}','{{ p.ip }}')">Enable</button>
+            <button class="btn-action btn-disable" onclick="doAction('disable',      '{{ p.queue }}','{{ p.ip }}')">Disable</button>
+            <button class="btn-action btn-print"   onclick="doAction('print_text',   '{{ p.queue }}','{{ p.ip }}')">Print Text</button>
+            <button class="btn-action btn-pdf"     onclick="doAction('print_pdf',    '{{ p.queue }}','{{ p.ip }}')">Print PDF</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% endif %}
+</div>
+
+<!-- ── Footer ── -->
+<footer class="app-footer">
+  &copy; Ebrahim K. Kanoo &mdash; Bahrain &ndash; IT Department &nbsp;|&nbsp; {{ version }}
+</footer>
+
+<!-- ── Result Modal ── -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span id="modal-title">Result</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-spinner" class="spinner hidden"></div>
+      <pre id="modal-output"></pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal-close" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Status labels ─────────────────────────────────────────────────────
+const STATUS_LABELS = {
+  idle:     { text: '● Ready',    cls: 'st-idle'     },
+  printing: { text: '● Printing', cls: 'st-printing' },
+  stuck:    { text: '● Stuck',    cls: 'st-stuck'    },
+  disabled: { text: '● Down',     cls: 'st-disabled' },
+  offline:  { text: '● Offline',  cls: 'st-offline'  },
+  unknown:  { text: '● Unknown',  cls: 'st-unknown'  },
+  nodata:   { text: '—',          cls: 'st-unknown'  }
+};
+
+const STUCK_MS = 5 * 60 * 1000; // 5 minutes
+
+function safeId(queue) { return 'st-' + queue.replace(/_/g, '-'); }
+
+function markPrinting(queue) {
+  if (!localStorage.getItem('ps_' + queue)) localStorage.setItem('ps_' + queue, Date.now());
+}
+function clearPrinting(queue) { localStorage.removeItem('ps_' + queue); }
+function isStuck(queue) {
+  const t = localStorage.getItem('ps_' + queue);
+  return t && (Date.now() - parseInt(t, 10)) > STUCK_MS;
+}
+
+function loadStatus() {
+  document.getElementById('status-summary').textContent = 'Loading status…';
+  fetch('/api/status')
+    .then(r => r.json())
+    .then(data => {
+      if (!data.success) {
+        document.getElementById('status-summary').textContent = 'Status unavailable';
+        return;
+      }
+      const statuses = data.statuses;
+      let idle = 0, printing = 0, stuck = 0, disabled = 0, offline = 0, unknown = 0;
+
+      const hasAny = Object.keys(statuses).length > 0;
+      document.querySelectorAll('.printer-row').forEach(row => {
+        const queue = row.dataset.queue;
+        let st = statuses[queue] || (hasAny ? 'unknown' : 'nodata');
+
+        if (st === 'printing') {
+          markPrinting(queue);
+          if (isStuck(queue)) st = 'stuck';
+        } else {
+          clearPrinting(queue);
+        }
+
+        const info  = STATUS_LABELS[st] || STATUS_LABELS.unknown;
+        const badge = document.getElementById(safeId(queue));
+        if (badge) { badge.textContent = info.text; badge.className = 'status-dot ' + info.cls; }
+        row.dataset.status = st;
+
+        row.classList.remove('row-idle','row-printing','row-stuck','row-disabled','row-offline','row-unknown');
+        const rowCls = { idle:'row-idle', printing:'row-printing', stuck:'row-stuck', disabled:'row-disabled', offline:'row-offline' };
+        row.classList.add(rowCls[st] || 'row-unknown');
+
+        if      (st === 'idle')     idle++;
+        else if (st === 'printing') printing++;
+        else if (st === 'stuck')    stuck++;
+        else if (st === 'disabled') disabled++;
+        else if (st === 'offline')  offline++;
+        else                        unknown++;
+      });
+
+      // Sort: down → offline → stuck → unknown → printing → ready
+      const tbody = document.getElementById('printer-tbody');
+      const rows  = Array.from(tbody.querySelectorAll('tr'));
+      const order = { disabled: 0, offline: 1, stuck: 2, unknown: 3, printing: 4, idle: 5 };
+      rows.sort((a, b) => (order[a.dataset.status] ?? 6) - (order[b.dataset.status] ?? 6));
+      rows.forEach(r => tbody.appendChild(r));
+
+      document.getElementById('status-summary').innerHTML =
+        `<span class="st-idle">&#9679; ${idle} ready</span>  ` +
+        `<span class="st-printing">&#9679; ${printing} printing</span>  ` +
+        (stuck    ? `<span class="st-stuck">&#9679; ${stuck} stuck (&gt;5 min)</span>  ` : '') +
+        (disabled ? `<span class="st-disabled">&#9679; ${disabled} down</span>  ` : '') +
+        (offline  ? `<span class="st-offline">&#9679; ${offline} offline</span>  ` : '') +
+        (unknown  ? `<span class="st-unknown">&#9679; ${unknown} unknown</span>` : '');
+    })
+    .catch(() => { document.getElementById('status-summary').textContent = 'Status unavailable'; });
+}
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+function filterTable() {
+  const q   = document.getElementById('filter-input').value.toLowerCase();
+  const sel = document.getElementById('queue-select');
+  if (sel) sel.value = '';
+  document.querySelectorAll('.printer-row').forEach(row => {
+    const match = !q || row.dataset.queue.toLowerCase().includes(q) || row.dataset.ip.includes(q);
+    row.style.display = match ? '' : 'none';
+  });
+}
+
+function filterBySelect() {
+  const val = document.getElementById('queue-select').value;
+  document.getElementById('filter-input').value = '';
+  document.querySelectorAll('.printer-row').forEach(row => {
+    if (!val) {
+      row.style.display = '';
+    } else {
+      const show = (row.dataset.queue === val);
+      row.style.display = show ? '' : 'none';
+      if (show) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+}
+
+// ── Actions ──────────────────────────────────────────────────────────────────
+const ACTION_LABELS = {
+  check:        q => `Check Queue — ${q}`,
+  cancel_first: q => `Cancel First Job — ${q}`,
+  cancel_all:   q => `Cancel All Jobs — ${q}`,
+  ping:         (q, ip) => `Ping Printer — ${ip}`,
+  enable:       q => `Enable Queue — ${q}`,
+  disable:      q => `Disable Queue — ${q}`,
+  print_text:   q => `Print Text Sample — ${q}`,
+  print_pdf:    q => `Print PDF Sample — ${q}`,
+};
+
+function openModal(title) {
+  document.getElementById('modal-title').textContent  = title;
+  document.getElementById('modal-output').textContent = '';
+  document.getElementById('modal-output').className   = '';
+  document.getElementById('modal-spinner').classList.remove('hidden');
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
+
+function showOutput(text, success) {
+  document.getElementById('modal-spinner').classList.add('hidden');
+  const pre = document.getElementById('modal-output');
+  pre.textContent = text || '(no output)';
+  pre.className   = success ? 'output-ok' : 'output-err';
+}
+
+function doAction(action, queue, ip) {
+  const label = (ACTION_LABELS[action] || (q => q))(queue, ip);
+  openModal(label);
+  fetch('/api/action', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ action, queue, ip })
+  })
+  .then(r => r.json())
+  .then(data => {
+    showOutput(data.output, data.success);
+    if (action === 'enable' || action === 'disable') loadStatus();
+  })
+  .catch(err => showOutput('Network error: ' + err, false));
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// Auto-load on page ready, then refresh every 3 minutes
+window.addEventListener('load', () => {
+  loadStatus();
+  setInterval(loadStatus, 3 * 60 * 1000);
+});
+</script>
+
+</body>
+</html>
