@@ -290,22 +290,25 @@ function showOutput(text, success) {
 }
 
 // ── Printer type helpers ──────────────────────────────────────────────────
-function isDotMatrix(q) { return /_LD\d/i.test(q) || /_ZD\d/i.test(q); }
-function isLaser(q)     { return /HLps/i.test(q)  || /ELps/i.test(q)  || /BRps/i.test(q) ||
-                                  /_HL\d/i.test(q)  || /_EL\d/i.test(q) || /_BR\d/i.test(q); }
+// Laser  (XL, EL, SL, HL, BR families) — Print PDF only
+function isLaser(q)     { return /XL|EL|SL/i.test(q) || /HLps|BRps/i.test(q) || /_HL\d|_BR\d/i.test(q); }
+// Dot-matrix (LD, TA, TL families) — Print Text only
+function isDotMatrix(q) { return /_LD|_TA|_TL/i.test(q); }
+// Barcode (ZD family) — both print buttons disabled
+function isBarcode(q)   { return /ZD/i.test(q); }
 
 function applyPrintButtonRules() {
   document.querySelectorAll('.printer-row').forEach(row => {
     const q      = row.dataset.queue;
     const txtBtn = row.querySelector('.btn-print');
     const pdfBtn = row.querySelector('.btn-pdf');
-    if (isLaser(q) && txtBtn) {
-      txtBtn.disabled = true;
-      txtBtn.title    = 'Laser printer — use Print PDF to avoid junk printing';
-    }
-    if (isDotMatrix(q) && pdfBtn) {
-      pdfBtn.disabled = true;
-      pdfBtn.title    = 'Dot-matrix printer — use Print Text';
+    if (isBarcode(q)) {
+      if (txtBtn) { txtBtn.disabled = true; txtBtn.title = 'Barcode printer — printing not supported from portal'; }
+      if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.title = 'Barcode printer — printing not supported from portal'; }
+    } else if (isLaser(q)) {
+      if (txtBtn) { txtBtn.disabled = true; txtBtn.title = 'Laser printer — use Print PDF to avoid junk printing'; }
+    } else if (isDotMatrix(q)) {
+      if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.title = 'Dot-matrix printer — use Print Text'; }
     }
   });
 }
@@ -327,12 +330,14 @@ function showWarnModal(title, msg, onProceed) {
 }
 
 function printWarning(action, queue) {
+  if (isBarcode(queue))
+    return null; // both buttons already disabled
   if (action === 'print_text' && isLaser(queue))
     return { title: '⚠️  Laser Printer — Wrong Print Method',
-             msg:   `"${queue}" is a LASER printer.\n\nPrint Text is for dot-matrix printers only (LD / ZD queues).\n\nSending a text job to a laser printer will cause CONTINUOUS JUNK PRINTING that cannot be stopped without powering off the printer.\n\nPlease use "Print PDF" for this printer.` };
+             msg:   `"${queue}" is a LASER printer (XL / EL / SL / HL / BR).\n\nPrint Text is for dot-matrix printers only.\n\nSending a text job to a laser printer will cause CONTINUOUS JUNK PRINTING that cannot be stopped without powering off the printer.\n\nPlease use "Print PDF" for this printer.` };
   if (action === 'print_pdf' && isDotMatrix(queue))
     return { title: '⚠️  Dot-Matrix Printer — Wrong Print Method',
-             msg:   `"${queue}" is a DOT-MATRIX printer.\n\nPrint PDF is for laser printers only (HLps / ELps / BRps queues).\n\nPlease use "Print Text" for this printer.` };
+             msg:   `"${queue}" is a DOT-MATRIX printer (LD / TA / TL).\n\nPrint PDF is for laser printers only.\n\nPlease use "Print Text" for this printer.` };
   return null;
 }
 
