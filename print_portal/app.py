@@ -175,21 +175,27 @@ def api_status():
     if not printers:
         return jsonify({"success": True, "statuses": {}})
 
-    # AIX lpstat: flag and queue name joined without space: lpstat -aQUEUE
-    # Output: row1=header, row2=dashes, row3=data; col3=Status (READY/DOWN/RUNNING…)
-    queue_list = " ".join(p["queue"] for p in printers)
+    # Parallel SSH: each queue runs lpstat + ping in a background subshell (&).
+    # Format per queue: "QUEUENAME LPSTAT_STATUS ping_result"
+    # Using & + wait means all 273 run simultaneously — total time ≈ slowest single call.
+    entries = " ".join(
+        "{}:{}".format(p["queue"], p["ip"] if p["ip"] else "none")
+        for p in printers
+    )
     cmd = (
-        "for q in " + queue_list + "; do "
+        "for e in " + entries + "; do ("
+        "q=${e%%:*}; ip=${e##*:}; "
         "s=$(lpstat -a$q 2>/dev/null | awk 'NR==3{print $3}'); "
-        "printf '%s %s\\n' \"$q\" \"$s\"; "
-        "done"
+        "if [ \"$ip\" = none ]; then pg=noip; "
+        "else ping -c1 $ip >/dev/null 2>&1 && pg=up || pg=down; fi; "
+        "printf '%s %s %s\\n' \"$q\" \"$s\" \"$pg\""
+        ")& done; wait"
     )
 
-    out, err, ok = ssh_run(cmd, timeout=60)
+    out, err, ok = ssh_run(cmd, timeout=90)
     if not ok:
         return jsonify({"success": False, "statuses": {}, "error": err})
 
-    # AIX status words → our status keys
     STATUS_MAP = {
         "READY":   "idle",
         "DOWN":    "disabled",
@@ -202,10 +208,19 @@ def api_status():
     statuses = {}
     for line in out.splitlines():
         parts = line.strip().split()
-        if len(parts) >= 2:
-            statuses[parts[0]] = STATUS_MAP.get(parts[1].upper(), "unknown")
-        elif len(parts) == 1:
-            statuses[parts[0]] = "unknown"
+        if not parts:
+            continue
+        queue   = parts[0]
+        lst_raw = parts[1].upper() if len(parts) > 1 else ""
+        ping_st = parts[2]         if len(parts) > 2 else "up"
+
+        mapped = STATUS_MAP.get(lst_raw, "unknown")
+        if mapped == "disabled":
+            statuses[queue] = "disabled"          # DOWN beats ping
+        elif ping_st == "down":
+            statuses[queue] = "offline"           # queue unknown but printer unreachable
+        else:
+            statuses[queue] = mapped
 
     return jsonify({"success": True, "statuses": statuses})
 

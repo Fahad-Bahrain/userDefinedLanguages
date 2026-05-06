@@ -233,6 +233,8 @@ body {
 /* Row status colors */
 .row-disabled       { background: #ffebee !important; }
 .row-disabled:hover { background: #ffcdd2 !important; }
+.row-offline        { background: #fce4ec !important; }
+.row-offline:hover  { background: #f8bbd0 !important; }
 .row-stuck          { background: #fff3e0 !important; }
 .row-stuck:hover    { background: #ffe0b2 !important; }
 .row-printing       { background: #e8f5e9 !important; }
@@ -252,6 +254,7 @@ body {
 .st-printing  { color: #1565c0; }
 .st-stuck     { color: #e65100; font-weight: 700; }
 .st-disabled  { color: #c62828; font-weight: 700; }
+.st-offline   { color: #ad1457; font-weight: 700; }
 .st-unknown   { color: #999; }
 
 /* ── Action Buttons ── */

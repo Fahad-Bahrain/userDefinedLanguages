@@ -135,6 +135,7 @@ const STATUS_LABELS = {
   printing: { text: '● Printing', cls: 'st-printing' },
   stuck:    { text: '● Stuck',    cls: 'st-stuck'    },
   disabled: { text: '● Down',     cls: 'st-disabled' },
+  offline:  { text: '● Offline',  cls: 'st-offline'  },
   unknown:  { text: '● Unknown',  cls: 'st-unknown'  },
   nodata:   { text: '—',          cls: 'st-unknown'  }
 };
@@ -162,7 +163,7 @@ function loadStatus() {
         return;
       }
       const statuses = data.statuses;
-      let idle = 0, printing = 0, stuck = 0, disabled = 0, unknown = 0;
+      let idle = 0, printing = 0, stuck = 0, disabled = 0, offline = 0, unknown = 0;
 
       const hasAny = Object.keys(statuses).length > 0;
       document.querySelectorAll('.printer-row').forEach(row => {
@@ -182,22 +183,23 @@ function loadStatus() {
         if (badge) { badge.textContent = info.text; badge.className = 'status-dot ' + info.cls; }
         row.dataset.status = st;
 
-        row.classList.remove('row-idle','row-printing','row-stuck','row-disabled','row-unknown');
-        const rowCls = { idle:'row-idle', printing:'row-printing', stuck:'row-stuck', disabled:'row-disabled' };
+        row.classList.remove('row-idle','row-printing','row-stuck','row-disabled','row-offline','row-unknown');
+        const rowCls = { idle:'row-idle', printing:'row-printing', stuck:'row-stuck', disabled:'row-disabled', offline:'row-offline' };
         row.classList.add(rowCls[st] || 'row-unknown');
 
         if      (st === 'idle')     idle++;
-        else if (st === 'stuck')    stuck++;
         else if (st === 'printing') printing++;
+        else if (st === 'stuck')    stuck++;
         else if (st === 'disabled') disabled++;
+        else if (st === 'offline')  offline++;
         else                        unknown++;
       });
 
-      // Sort: down → stuck → unknown → printing → ready
+      // Sort: down → offline → stuck → unknown → printing → ready
       const tbody = document.getElementById('printer-tbody');
       const rows  = Array.from(tbody.querySelectorAll('tr'));
-      const order = { disabled: 0, stuck: 1, unknown: 2, printing: 3, idle: 4 };
-      rows.sort((a, b) => (order[a.dataset.status] ?? 5) - (order[b.dataset.status] ?? 5));
+      const order = { disabled: 0, offline: 1, stuck: 2, unknown: 3, printing: 4, idle: 5 };
+      rows.sort((a, b) => (order[a.dataset.status] ?? 6) - (order[b.dataset.status] ?? 6));
       rows.forEach(r => tbody.appendChild(r));
 
       document.getElementById('status-summary').innerHTML =
@@ -205,6 +207,7 @@ function loadStatus() {
         `<span class="st-printing">&#9679; ${printing} printing</span>  ` +
         (stuck    ? `<span class="st-stuck">&#9679; ${stuck} stuck (&gt;5 min)</span>  ` : '') +
         (disabled ? `<span class="st-disabled">&#9679; ${disabled} down</span>  ` : '') +
+        (offline  ? `<span class="st-offline">&#9679; ${offline} offline</span>  ` : '') +
         (unknown  ? `<span class="st-unknown">&#9679; ${unknown} unknown</span>` : '');
     })
     .catch(() => { document.getElementById('status-summary').textContent = 'Status unavailable'; });
