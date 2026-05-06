@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_file
+from functools import wraps
 import paramiko
 import pandas as pd
 import json
@@ -18,7 +19,8 @@ APP_VERSION = "v2.0"
 # print_portal\ lives inside C:\AIX_Monitor\
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(BASE_DIR)
-USERS_FILE = os.path.join(BASE_DIR, "users.json")
+USERS_FILE    = os.path.join(BASE_DIR, "users.json")
+OVERRIDE_FILE = os.path.join(BASE_DIR, "printers_override.json")
 
 
 def _find_file(*names):
@@ -41,17 +43,56 @@ def load_users():
         return json.load(f)
 
 
+def load_override():
+    if not os.path.exists(OVERRIDE_FILE):
+        return {"added": [], "edited": {}, "deleted": [], "ignored": []}
+    with open(OVERRIDE_FILE, encoding="utf-8") as f:
+        data = json.load(f)
+    data.setdefault("added",   [])
+    data.setdefault("edited",  {})
+    data.setdefault("deleted", [])
+    data.setdefault("ignored", [])
+    return data
+
+
+def save_override(data):
+    with open(OVERRIDE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
 def load_printers():
-    if not os.path.exists(EXCEL_FILE):
-        return []
-    df = pd.read_excel(EXCEL_FILE)
-    df.columns = [c.strip() for c in df.columns]
-    printers = []
-    for _, row in df.iterrows():
-        ip    = str(row.get("IP Address", "")).strip()
-        queue = str(row.get("Printer Queue Name", "")).strip()
-        if ip and queue and ip != "nan" and queue != "nan":
-            printers.append({"ip": ip, "queue": queue})
+    override = load_override()
+    deleted  = set(override["deleted"])
+    edited   = override["edited"]
+
+    printers    = []
+    seen_queues = set()
+
+    if os.path.exists(EXCEL_FILE):
+        df = pd.read_excel(EXCEL_FILE)
+        df.columns = [c.strip() for c in df.columns]
+        for _, row in df.iterrows():
+            ip    = str(row.get("IP Address", "")).strip()
+            queue = str(row.get("Printer Queue Name", "")).strip()
+            if ip and queue and ip != "nan" and queue != "nan":
+                if queue not in deleted:
+                    if queue in edited:
+                        ip = edited[queue].get("ip", ip)
+                    printers.append({"ip": ip, "queue": queue})
+                    seen_queues.add(queue)
+
+    # Admin-added printers not in Excel
+    ignored = set(override["ignored"])
+    for p in override["added"]:
+        q = p["queue"]
+        if q not in deleted and q not in seen_queues and q not in ignored:
+            ip = edited.get(q, {}).get("ip", p["ip"])
+            printers.append({"ip": ip, "queue": q})
+            seen_queues.add(q)
+
+    # Remove ignored from excel-sourced printers too
+    printers = [p for p in printers if p["queue"] not in ignored]
+
     return printers
 
 
@@ -321,6 +362,158 @@ def api_action():
 
 def _parse_jobs(lpstat_output, queue):
     return re.findall(rf"{re.escape(queue)}-(\d+)", lpstat_output)
+
+
+# ── Admin guard ───────────────────────────────────────────────────────────────
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "username" not in session or session.get("role") != "admin":
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ── Admin printer management ──────────────────────────────────────────────────
+
+@app.route("/admin/printers")
+@admin_required
+def admin_printers():
+    override      = load_override()
+    added_queues  = {p["queue"] for p in override["added"]}
+    edited_queues = set(override["edited"].keys())
+    ignored_set   = set(override["ignored"])
+    deleted_set   = set(override["deleted"])
+
+    # Build full list: active + ignored (so admin can see and restore)
+    active    = load_printers()
+    for p in active:
+        q = p["queue"]
+        if q in added_queues:
+            p["source"] = "added"
+        elif q in edited_queues:
+            p["source"] = "edited"
+        else:
+            p["source"] = "excel"
+        p["ignored"] = False
+
+    # Ignored printers (rebuild them from Excel + added)
+    ignored_printers = []
+    if os.path.exists(EXCEL_FILE):
+        df = pd.read_excel(EXCEL_FILE)
+        df.columns = [c.strip() for c in df.columns]
+        for _, row in df.iterrows():
+            ip    = str(row.get("IP Address", "")).strip()
+            queue = str(row.get("Printer Queue Name", "")).strip()
+            if ip and queue and ip != "nan" and queue != "nan":
+                if queue in ignored_set and queue not in deleted_set:
+                    src = "edited" if queue in edited_queues else "excel"
+                    ip  = override["edited"].get(queue, {}).get("ip", ip)
+                    ignored_printers.append({"queue": queue, "ip": ip,
+                                             "source": src, "ignored": True})
+    for p in override["added"]:
+        q = p["queue"]
+        if q in ignored_set and q not in deleted_set:
+            ip = override["edited"].get(q, {}).get("ip", p["ip"])
+            ignored_printers.append({"queue": q, "ip": ip,
+                                     "source": "added", "ignored": True})
+
+    all_printers = active + ignored_printers
+    return render_template("admin_printers.html",
+                           printers=all_printers,
+                           user=session,
+                           version=APP_VERSION)
+
+
+@app.route("/api/admin/printer/add", methods=["POST"])
+@admin_required
+def admin_add_printer():
+    data  = request.get_json(force=True)
+    queue = data.get("queue", "").strip().upper()
+    ip    = data.get("ip", "").strip()
+    if not queue or not ip:
+        return jsonify({"success": False, "message": "Queue name and IP are required."})
+
+    override = load_override()
+
+    # If previously deleted, restore it
+    if queue in override["deleted"]:
+        override["deleted"].remove(queue)
+        override["edited"][queue] = {"ip": ip}
+        save_override(override)
+        return jsonify({"success": True, "message": f"Printer '{queue}' restored."})
+
+    # If ignored, un-ignore and update IP
+    if queue in override["ignored"]:
+        override["ignored"].remove(queue)
+        override["edited"][queue] = {"ip": ip}
+        save_override(override)
+        return jsonify({"success": True, "message": f"Printer '{queue}' un-ignored and activated."})
+
+    # Check if already active
+    existing = {p["queue"] for p in load_printers()}
+    if queue in existing:
+        return jsonify({"success": False,
+                        "message": f"Queue '{queue}' already exists. Use Edit IP to change address."})
+
+    override["added"].append({"queue": queue, "ip": ip})
+    save_override(override)
+    return jsonify({"success": True, "message": f"Printer '{queue}' added successfully."})
+
+
+@app.route("/api/admin/printer/edit", methods=["POST"])
+@admin_required
+def admin_edit_printer():
+    data  = request.get_json(force=True)
+    queue = data.get("queue", "").strip()
+    ip    = data.get("ip", "").strip()
+    if not queue or not ip:
+        return jsonify({"success": False, "message": "Queue name and IP are required."})
+
+    override = load_override()
+    override["edited"][queue] = {"ip": ip}
+    save_override(override)
+    return jsonify({"success": True, "message": f"IP for '{queue}' updated to {ip}."})
+
+
+@app.route("/api/admin/printer/delete", methods=["POST"])
+@admin_required
+def admin_delete_printer():
+    data  = request.get_json(force=True)
+    queue = data.get("queue", "").strip()
+    if not queue:
+        return jsonify({"success": False, "message": "Queue name required."})
+
+    override = load_override()
+    if queue not in override["deleted"]:
+        override["deleted"].append(queue)
+    override["added"]  = [p for p in override["added"]  if p["queue"] != queue]
+    override["ignored"] = [q for q in override["ignored"] if q != queue]
+    override["edited"].pop(queue, None)
+    save_override(override)
+    return jsonify({"success": True, "message": f"Printer '{queue}' deleted."})
+
+
+@app.route("/api/admin/printer/ignore", methods=["POST"])
+@admin_required
+def admin_ignore_printer():
+    data   = request.get_json(force=True)
+    queue  = data.get("queue", "").strip()
+    ignore = data.get("ignore", True)   # True = ignore, False = un-ignore
+    if not queue:
+        return jsonify({"success": False, "message": "Queue name required."})
+
+    override = load_override()
+    if ignore:
+        if queue not in override["ignored"]:
+            override["ignored"].append(queue)
+        msg = f"Printer '{queue}' is now ignored (hidden from dashboard)."
+    else:
+        override["ignored"] = [q for q in override["ignored"] if q != queue]
+        msg = f"Printer '{queue}' is now active."
+    save_override(override)
+    return jsonify({"success": True, "message": msg})
 
 
 if __name__ == "__main__":

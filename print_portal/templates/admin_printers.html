@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Manage Printers</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+.admin-section {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+.admin-section-title {
+  background: #1a3a5c;
+  color: #fff;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.form-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 16px;
+  flex-wrap: wrap;
+}
+.form-row input {
+  padding: 9px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+.form-row input:focus { border-color: #1565c0; }
+.form-row input.inp-queue { min-width: 220px; text-transform: uppercase; }
+.form-row input.inp-ip    { min-width: 180px; font-family: monospace; }
+
+.btn-add {
+  background: #2e7d32; color: #fff;
+  border: none; border-radius: 5px;
+  padding: 9px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.btn-add:hover { background: #1b5e20; }
+
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table thead tr { background: #eef2f7; }
+.admin-table th {
+  padding: 10px 12px; text-align: left;
+  font-size: 13px; color: #1a3a5c; font-weight: 700;
+  border-bottom: 2px solid #d0d8e4;
+}
+.admin-table tbody tr { border-bottom: 1px solid #f0f2f5; transition: background .1s; }
+.admin-table tbody tr:hover { background: #f5f8ff; }
+.admin-table tbody tr.row-ignored { background: #f5f5f5; color: #999; }
+.admin-table tbody tr.row-ignored:hover { background: #eeeeee; }
+.admin-table td { padding: 8px 12px; font-size: 13px; vertical-align: middle; }
+
+.badge {
+  font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 8px; white-space: nowrap;
+}
+.badge-excel   { background: #e3f2fd; color: #1565c0; }
+.badge-added   { background: #e8f5e9; color: #2e7d32; }
+.badge-edited  { background: #fff8e1; color: #e65100; }
+.badge-ignored { background: #eeeeee; color: #757575; }
+
+.ip-cell { font-family: 'Consolas', monospace; font-size: 12px; color: #555; }
+
+.msg-box {
+  padding: 10px 16px;
+  font-size: 13px; font-weight: 600;
+  border-radius: 6px;
+  margin: 0 0 14px 0;
+  display: none;
+}
+.msg-ok  { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+.msg-err { background: #fdecea; color: #c62828; border: 1px solid #ef9a9a; }
+
+.search-input {
+  padding: 5px 10px;
+  font-size: 12px;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  width: 210px;
+  color: #333;
+  font-weight: 400;
+  outline: none;
+}
+.search-input:focus { border-color: #1565c0; }
+
+.count-badge {
+  background: rgba(255,255,255,.18);
+  font-size: 12px; font-weight: 600;
+  padding: 2px 9px; border-radius: 8px;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Top Nav ── -->
+<nav class="topnav">
+  <div class="nav-left">
+    <div class="nav-logo-box">
+      <img src="/logo" alt="EKK" class="nav-logo"
+           onerror="this.parentElement.innerHTML='<span class=\'nav-logo-text\'>EKK</span>'">
+    </div>
+  </div>
+  <div class="nav-center">
+    <div class="nav-title">Oracle Print Portal</div>
+    <div class="nav-subtitle">Admin — Manage Printer Queues</div>
+  </div>
+  <div class="nav-right">
+    <span class="user-name">{{ user.name }}</span>
+    <span class="role-badge">Admin</span>
+    <a href="/dashboard" class="btn-logout">&#8592; Dashboard</a>
+    <a href="/logout" class="btn-logout">Logout</a>
+  </div>
+</nav>
+
+<div class="main-content">
+
+  <div id="flash-msg" class="msg-box"></div>
+
+  <!-- ── Add New Printer ── -->
+  <div class="admin-section">
+    <div class="admin-section-title">&#43; Add New Printer Queue</div>
+    <div class="form-row">
+      <input class="inp-queue" type="text" id="new-queue" placeholder="Queue Name  e.g. TSC_HL1">
+      <input class="inp-ip"    type="text" id="new-ip"    placeholder="IP Address  e.g. 192.168.1.100">
+      <button class="btn-add" onclick="addPrinter()">Add Printer</button>
+      <span style="font-size:12px; color:#777;">Queue name will be auto-uppercased.</span>
+    </div>
+  </div>
+
+  <!-- ── Printer List ── -->
+  <div class="admin-section">
+    <div class="admin-section-title">
+      All Printer Queues
+      <span class="count-badge" id="total-count">{{ printers|length }} total</span>
+      <input class="search-input" type="search" id="admin-filter"
+             placeholder="&#128269; Search queue or IP…" oninput="filterAdmin()">
+    </div>
+    <table class="admin-table" id="admin-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Queue Name</th>
+          <th>IP Address</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="admin-tbody">
+        {% for p in printers %}
+        <tr data-queue="{{ p.queue }}" data-ip="{{ p.ip }}"
+            class="{{ 'row-ignored' if p.ignored else '' }}">
+          <td style="color:#aaa; font-size:12px; width:36px;">{{ loop.index }}</td>
+          <td style="font-weight:600; color:{{ '#999' if p.ignored else '#1a3a5c' }}; font-size:13px;">
+            {{ p.queue }}
+          </td>
+          <td class="ip-cell" style="{{ 'color:#bbb;' if p.ignored else '' }}">{{ p.ip }}</td>
+          <td>
+            {% if p.ignored %}
+              <span class="badge badge-ignored">Ignored</span>
+            {% elif p.source == 'added' %}
+              <span class="badge badge-added">Admin Added</span>
+            {% elif p.source == 'edited' %}
+              <span class="badge badge-excel">Excel</span>
+              <span class="badge badge-edited">IP Edited</span>
+            {% else %}
+              <span class="badge badge-excel">Excel</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap;">
+            {% if not p.ignored %}
+              <button class="btn-action btn-check"
+                      onclick="startEdit(this, '{{ p.queue }}', '{{ p.ip }}')">Edit IP</button>
+              <button class="btn-action btn-disable"
+                      onclick="ignorePrinter('{{ p.queue }}', true)">Ignore</button>
+              <button class="btn-action btn-cancel1"
+                      onclick="deletePrinter('{{ p.queue }}')">Delete</button>
+            {% else %}
+              <button class="btn-action btn-enable"
+                      onclick="ignorePrinter('{{ p.queue }}', false)">Un-ignore</button>
+              <button class="btn-action btn-cancel1"
+                      onclick="deletePrinter('{{ p.queue }}')">Delete</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer class="app-footer">
+  &copy; Ebrahim K. Kanoo &mdash; Bahrain &ndash; IT Department &nbsp;|&nbsp; {{ version }}
+</footer>
+
+<script>
+// ── Flash message ─────────────────────────────────────────────────────────────
+function flash(msg, ok) {
+  const el = document.getElementById('flash-msg');
+  el.textContent = msg;
+  el.className   = 'msg-box ' + (ok ? 'msg-ok' : 'msg-err');
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+// ── Add printer ───────────────────────────────────────────────────────────────
+function addPrinter() {
+  const queue = document.getElementById('new-queue').value.trim().toUpperCase();
+  const ip    = document.getElementById('new-ip').value.trim();
+  if (!queue || !ip) { flash('Please enter both Queue Name and IP Address.', false); return; }
+
+  fetch('/api/admin/printer/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ queue, ip })
+  })
+  .then(r => r.json())
+  .then(d => {
+    flash(d.message, d.success);
+    if (d.success) {
+      document.getElementById('new-queue').value = '';
+      document.getElementById('new-ip').value    = '';
+      setTimeout(() => location.reload(), 1500);
+    }
+  })
+  .catch(e => flash('Network error: ' + e, false));
+}
+
+// ── Edit IP inline ────────────────────────────────────────────────────────────
+function startEdit(btn, queue, ip) {
+  const row    = btn.closest('tr');
+  const ipCell = row.querySelector('.ip-cell');
+  const curIp  = ipCell.textContent.trim();
+  ipCell.innerHTML =
+    `<input type="text" id="edit-ip-${queue.replace(/[^a-z0-9]/gi,'-')}"
+            value="${curIp}"
+            style="padding:4px 8px; border:1px solid #1565c0; border-radius:4px;
+                   font-size:12px; width:180px; font-family:monospace; outline:none;">`;
+  btn.textContent = 'Save';
+  btn.className   = 'btn-action btn-print';
+  btn.onclick     = () => saveEdit(btn, queue);
+}
+
+function saveEdit(btn, queue) {
+  const safeId = 'edit-ip-' + queue.replace(/[^a-z0-9]/gi, '-');
+  const input  = document.getElementById(safeId);
+  const newIp  = input ? input.value.trim() : '';
+  if (!newIp) { flash('IP address cannot be empty.', false); return; }
+
+  fetch('/api/admin/printer/edit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ queue, ip: newIp })
+  })
+  .then(r => r.json())
+  .then(d => {
+    flash(d.message, d.success);
+    if (d.success) setTimeout(() => location.reload(), 1500);
+  })
+  .catch(e => flash('Network error: ' + e, false));
+}
+
+// ── Ignore / Un-ignore ────────────────────────────────────────────────────────
+function ignorePrinter(queue, ignore) {
+  const action = ignore ? 'ignore' : 'un-ignore';
+  if (!confirm(`${ignore ? 'Ignore' : 'Un-ignore'} printer "${queue}"?\n\n${
+    ignore
+      ? 'It will be hidden from the dashboard (dummy/not connected).'
+      : 'It will become visible on the dashboard again.'
+  }`)) return;
+
+  fetch('/api/admin/printer/ignore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ queue, ignore })
+  })
+  .then(r => r.json())
+  .then(d => {
+    flash(d.message, d.success);
+    if (d.success) setTimeout(() => location.reload(), 1500);
+  })
+  .catch(e => flash('Network error: ' + e, false));
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+function deletePrinter(queue) {
+  if (!confirm(`Permanently delete queue "${queue}"?\n\nIt will be removed from the portal for all users.`)) return;
+
+  fetch('/api/admin/printer/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ queue })
+  })
+  .then(r => r.json())
+  .then(d => {
+    flash(d.message, d.success);
+    if (d.success) setTimeout(() => location.reload(), 1500);
+  })
+  .catch(e => flash('Network error: ' + e, false));
+}
+
+// ── Search filter ─────────────────────────────────────────────────────────────
+function filterAdmin() {
+  const q = document.getElementById('admin-filter').value.toLowerCase();
+  let visible = 0;
+  document.querySelectorAll('#admin-tbody tr').forEach(row => {
+    const text = (row.dataset.queue + ' ' + row.dataset.ip).toLowerCase();
+    const show = text.includes(q);
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('total-count').textContent =
+    q ? `${visible} matched` : `{{ printers|length }} total`;
+}
+
+// Auto-uppercase queue name input
+document.getElementById('new-queue').addEventListener('input', function () {
+  const pos = this.selectionStart;
+  this.value = this.value.toUpperCase();
+  this.setSelectionRange(pos, pos);
+});
+
+// Enter key in add form
+document.getElementById('new-ip').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addPrinter();
+});
+document.getElementById('new-queue').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('new-ip').focus();
+});
+</script>
+</body>
+</html>

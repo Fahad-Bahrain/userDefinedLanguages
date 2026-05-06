@@ -28,7 +28,10 @@
   <!-- Right: user + logout -->
   <div class="nav-right">
     <span class="user-name">{{ user.name }}</span>
-    {% if user.role == 'admin' %}<span class="role-badge">Admin</span>{% endif %}
+    {% if user.role == 'admin' %}
+      <span class="role-badge">Admin</span>
+      <a href="/admin/printers" class="btn-logout" style="background:rgba(255,152,0,.28);">&#9881; Manage Printers</a>
+    {% endif %}
     <a href="/logout" class="btn-logout">Logout</a>
   </div>
 </nav>
@@ -124,6 +127,23 @@
     </div>
     <div class="modal-footer">
       <button class="btn-modal-close" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Warning Modal ── -->
+<div id="warn-overlay" class="modal-overlay hidden" onclick="closeWarnModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header warn-header">
+      <span id="warn-title">⚠️ Warning</span>
+      <button class="modal-close" onclick="closeWarnModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <pre id="warn-message" class="warn-message"></pre>
+    </div>
+    <div class="modal-footer warn-footer">
+      <button class="btn-modal-close" onclick="closeWarnModal()">Cancel</button>
+      <button class="btn-proceed" id="btn-proceed-anyway">Proceed Anyway</button>
     </div>
   </div>
 </div>
@@ -269,7 +289,61 @@ function showOutput(text, success) {
   pre.className   = success ? 'output-ok' : 'output-err';
 }
 
+// ── Printer type helpers ──────────────────────────────────────────────────
+function isDotMatrix(q) { return /_LD\d/i.test(q) || /_ZD\d/i.test(q); }
+function isLaser(q)     { return /HLps/i.test(q)  || /ELps/i.test(q)  || /BRps/i.test(q) ||
+                                  /_HL\d/i.test(q)  || /_EL\d/i.test(q) || /_BR\d/i.test(q); }
+
+function applyPrintButtonRules() {
+  document.querySelectorAll('.printer-row').forEach(row => {
+    const q      = row.dataset.queue;
+    const txtBtn = row.querySelector('.btn-print');
+    const pdfBtn = row.querySelector('.btn-pdf');
+    if (isLaser(q) && txtBtn) {
+      txtBtn.disabled = true;
+      txtBtn.title    = 'Laser printer — use Print PDF to avoid junk printing';
+    }
+    if (isDotMatrix(q) && pdfBtn) {
+      pdfBtn.disabled = true;
+      pdfBtn.title    = 'Dot-matrix printer — use Print Text';
+    }
+  });
+}
+
+// ── Warning modal ─────────────────────────────────────────────────────────
+let _pendingAction = null;
+
+function closeWarnModal() {
+  _pendingAction = null;
+  document.getElementById('warn-overlay').classList.add('hidden');
+}
+
+function showWarnModal(title, msg, onProceed) {
+  _pendingAction = onProceed;
+  document.getElementById('warn-title').textContent   = title;
+  document.getElementById('warn-message').textContent = msg;
+  document.getElementById('btn-proceed-anyway').onclick = () => { closeWarnModal(); onProceed(); };
+  document.getElementById('warn-overlay').classList.remove('hidden');
+}
+
+function printWarning(action, queue) {
+  if (action === 'print_text' && isLaser(queue))
+    return { title: '⚠️  Laser Printer — Wrong Print Method',
+             msg:   `"${queue}" is a LASER printer.\n\nPrint Text is for dot-matrix printers only (LD / ZD queues).\n\nSending a text job to a laser printer will cause CONTINUOUS JUNK PRINTING that cannot be stopped without powering off the printer.\n\nPlease use "Print PDF" for this printer.` };
+  if (action === 'print_pdf' && isDotMatrix(queue))
+    return { title: '⚠️  Dot-Matrix Printer — Wrong Print Method',
+             msg:   `"${queue}" is a DOT-MATRIX printer.\n\nPrint PDF is for laser printers only (HLps / ELps / BRps queues).\n\nPlease use "Print Text" for this printer.` };
+  return null;
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────
 function doAction(action, queue, ip) {
+  const warn = printWarning(action, queue);
+  if (warn) { showWarnModal(warn.title, warn.msg, () => executeAction(action, queue, ip)); return; }
+  executeAction(action, queue, ip);
+}
+
+function executeAction(action, queue, ip) {
   const label = (ACTION_LABELS[action] || (q => q))(queue, ip);
   openModal(label);
   fetch('/api/action', {
@@ -280,16 +354,16 @@ function doAction(action, queue, ip) {
   .then(r => r.json())
   .then(data => {
     showOutput(data.output, data.success);
-    // After enable/disable refresh that row's status
     if (action === 'enable' || action === 'disable') loadStatus();
   })
   .catch(err => showOutput('Network error: ' + err, false));
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeWarnModal(); } });
 
 // Auto-load on page ready, then refresh every 3 minutes
 window.addEventListener('load', () => {
+  applyPrintButtonRules();
   loadStatus();
   setInterval(loadStatus, 3 * 60 * 1000);
 });
