@@ -177,16 +177,6 @@ $htmlBody = @"
 <p>$credNote</p>
 <hr/>
 
-<h3 style="color:#1a5276">Script Execution Status</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">
-  <tr style="background:#1a5276;color:white">
-    <th>Group</th><th>Script</th><th>Status</th><th>Duration</th>
-  </tr>
-  $($scriptRows -join "`n")
-</table>
-
-<br/>
-
 <h3 style="color:#1a5276">Sync Summary</h3>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">
   <tr style="background:#1a5276;color:white">
