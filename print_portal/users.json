@@ -33,6 +33,6 @@
     "password": "Azzat@123",
     "name": "Azzat",
     "role": "user",
-    "prefixes": ["DENSO", "KBSC"]
+    "prefixes": ["DEN", "KBSC"]
   }
 }
