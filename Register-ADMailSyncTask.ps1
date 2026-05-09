@@ -99,19 +99,15 @@ foreach ($t in $tasks) {
                     -MultipleInstances     IgnoreNew `
                     -RunOnlyIfNetworkAvailable
 
-    $principal = New-ScheduledTaskPrincipal `
-                     -UserId   $RunAsUser `
-                     -LogonType Password `
-                     -RunLevel Highest
-
     Register-ScheduledTask `
-        -TaskName   $t.Name `
+        -TaskName    $t.Name `
         -Description $t.Description `
-        -Action     $action `
-        -Trigger    $trigger `
-        -Settings   $settings `
-        -Principal  $principal `
-        -Password   $RunAsPassword `
+        -Action      $action `
+        -Trigger     $trigger `
+        -Settings    $settings `
+        -User        $RunAsUser `
+        -Password    $RunAsPassword `
+        -RunLevel    Highest `
         -Force | Out-Null
 
     Write-Host "  [OK] Registered : $($t.Name)" -ForegroundColor Green
