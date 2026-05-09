@@ -32,9 +32,31 @@
       <span class="role-badge">Admin</span>
       <a href="/admin/printers" class="btn-logout" style="background:rgba(255,152,0,.28);">&#9881; Manage Printers</a>
     {% endif %}
+    <button onclick="openChangePwd()" class="btn-logout" style="background:rgba(100,180,255,.22);border:none;cursor:pointer;">&#128273; Change Password</button>
     <a href="/logout" class="btn-logout">Logout</a>
   </div>
 </nav>
+
+<!-- ── Change Password Modal ── -->
+<div id="changePwdModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#1e2a3a;border:1px solid #334;border-radius:10px;padding:28px 32px;width:340px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.5);">
+    <h3 style="margin:0 0 18px;color:#7ecfff;font-size:16px;">&#128273; Change Password</h3>
+    <div id="cpMsg" style="display:none;padding:8px 12px;border-radius:6px;margin-bottom:14px;font-size:13px;"></div>
+    <label style="color:#aac;font-size:13px;">Current Password</label>
+    <input id="cpCurrent" type="password" placeholder="Enter current password"
+           style="width:100%;box-sizing:border-box;margin:4px 0 12px;padding:8px 10px;border-radius:6px;border:1px solid #445;background:#111d2b;color:#eee;font-size:14px;">
+    <label style="color:#aac;font-size:13px;">New Password</label>
+    <input id="cpNew" type="password" placeholder="Min 6 characters"
+           style="width:100%;box-sizing:border-box;margin:4px 0 12px;padding:8px 10px;border-radius:6px;border:1px solid #445;background:#111d2b;color:#eee;font-size:14px;">
+    <label style="color:#aac;font-size:13px;">Confirm New Password</label>
+    <input id="cpConfirm" type="password" placeholder="Repeat new password"
+           style="width:100%;box-sizing:border-box;margin:4px 0 18px;padding:8px 10px;border-radius:6px;border:1px solid #445;background:#111d2b;color:#eee;font-size:14px;">
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeChangePwd()" style="padding:8px 18px;border-radius:6px;border:1px solid #445;background:#2a3a4a;color:#aac;cursor:pointer;font-size:13px;">Cancel</button>
+      <button onclick="submitChangePwd()" style="padding:8px 18px;border-radius:6px;border:none;background:#2196f3;color:#fff;cursor:pointer;font-size:13px;font-weight:bold;">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Main ── -->
 <div class="main-content">
@@ -372,6 +394,46 @@ window.addEventListener('load', () => {
   loadStatus();
   setInterval(loadStatus, 3 * 60 * 1000);
 });
+
+function openChangePwd() {
+  document.getElementById('cpCurrent').value = '';
+  document.getElementById('cpNew').value = '';
+  document.getElementById('cpConfirm').value = '';
+  document.getElementById('cpMsg').style.display = 'none';
+  const m = document.getElementById('changePwdModal');
+  m.style.display = 'flex';
+  document.getElementById('cpCurrent').focus();
+}
+
+function closeChangePwd() {
+  document.getElementById('changePwdModal').style.display = 'none';
+}
+
+async function submitChangePwd() {
+  const msg     = document.getElementById('cpMsg');
+  const current = document.getElementById('cpCurrent').value;
+  const nw      = document.getElementById('cpNew').value;
+  const confirm = document.getElementById('cpConfirm').value;
+
+  const res  = await fetch('/api/change-password', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({current_password: current, new_password: nw, confirm_password: confirm})
+  });
+  const data = await res.json();
+
+  msg.style.display = 'block';
+  if (data.success) {
+    msg.style.background = '#1a4a2a';
+    msg.style.color = '#7ddc9b';
+    msg.textContent = data.message;
+    setTimeout(closeChangePwd, 1500);
+  } else {
+    msg.style.background = '#4a1a1a';
+    msg.style.color = '#ff8888';
+    msg.textContent = data.message;
+  }
+}
 </script>
 
 </body>

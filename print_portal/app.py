@@ -43,6 +43,11 @@ def load_users():
         return json.load(f)
 
 
+def save_users(users):
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(users, f, indent=2)
+
+
 def load_override():
     if not os.path.exists(OVERRIDE_FILE):
         return {"added": [], "edited": {}, "deleted": [], "ignored": []}
@@ -530,6 +535,31 @@ def admin_ignore_printer():
         msg = f"Printer '{queue}' is now active."
     save_override(override)
     return jsonify({"success": True, "message": msg})
+
+
+@app.route("/api/change-password", methods=["POST"])
+def change_password():
+    if "username" not in session:
+        return jsonify({"success": False, "message": "Not authenticated."}), 401
+
+    data         = request.get_json(force=True)
+    current_pwd  = data.get("current_password", "")
+    new_pwd      = data.get("new_password", "").strip()
+    confirm_pwd  = data.get("confirm_password", "").strip()
+
+    users    = load_users()
+    username = session["username"]
+
+    if users[username]["password"] != current_pwd:
+        return jsonify({"success": False, "message": "Current password is incorrect."})
+    if len(new_pwd) < 6:
+        return jsonify({"success": False, "message": "New password must be at least 6 characters."})
+    if new_pwd != confirm_pwd:
+        return jsonify({"success": False, "message": "New passwords do not match."})
+
+    users[username]["password"] = new_pwd
+    save_users(users)
+    return jsonify({"success": True, "message": "Password changed successfully."})
 
 
 if __name__ == "__main__":
