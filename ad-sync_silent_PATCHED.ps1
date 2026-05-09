@@ -209,7 +209,12 @@ function Do-Export {
 
   Rotate-CSVs -Folder $OutDir -Keep 10
 
-  @{ All = $csvAll; System = $csvSys; Disabled = $csvDis }
+  $cntAll = (Import-Csv $csvAll).Count
+  $cntSys = (Import-Csv $csvSys).Count
+  $cntDis = (Import-Csv $csvDis).Count
+
+  @{ All = $csvAll; System = $csvSys; Disabled = $csvDis
+     CntAll = $cntAll; CntSys = $cntSys; CntDis = $cntDis }
 }
 
 # ---------------- Group Sync ----------------
@@ -329,7 +334,8 @@ function Do-GroupSync {
 
 # ---------------- HTML Email ----------------
 function Build-HtmlReport {
-  param([object]$Plan, [string]$Mode, [bool]$Failed = $false, [string]$ErrorMsg = "")
+  param([object]$Plan, [string]$Mode, [bool]$Failed = $false, [string]$ErrorMsg = "",
+        [int]$CntAll = 0, [int]$CntSys = 0, [int]$CntDis = 0)
 
   $runDate = Get-Date -Format 'dd-MMM-yyyy HH:mm'
 
@@ -387,7 +393,14 @@ tr:nth-child(even) td{background-color:#f4f7fb}
 <p><b>Run Date:</b> $runDate</p>
 <p><b>Domain Controller:</b> $Server</p>
 <p><b>Mode:</b> $Mode</p>
-<h3>Sync Summary</h3>
+<h3>Current Employee Counts</h3>
+<table>
+<tr><th>Group</th><th style='text-align:center'>Total Members</th></tr>
+<tr><td>$GroupAll</td><td style='text-align:center;font-weight:bold;font-size:15px'>$CntAll</td></tr>
+<tr><td>$GroupSystem</td><td style='text-align:center;font-weight:bold;font-size:15px'>$CntSys</td></tr>
+<tr><td>$GroupDisabled</td><td style='text-align:center;font-weight:bold;font-size:15px'>$CntDis</td></tr>
+</table>
+<h3>Sync Summary (Changes This Run)</h3>
 <table>
 <tr><th>Group</th><th>Added</th><th>Removed</th><th>Total Changes</th></tr>
 <tr><td>$GroupAll</td><td>$r1a</td><td>$r1r</td><td>$r1t</td></tr>
@@ -452,7 +465,7 @@ try {
   Write-Log "--- AD Mail Sync Finished Successfully ---"
 
   $mode    = if ($Apply) { 'APPLIED' } else { 'PLAN-ONLY' }
-  $html    = Build-HtmlReport -Plan $plan -Mode $mode
+  $html    = Build-HtmlReport -Plan $plan -Mode $mode -CntAll $csvs.CntAll -CntSys $csvs.CntSys -CntDis $csvs.CntDis
   Send-SummaryMail -HtmlBody $html
 
   Write-Log "COMPLETED OK"

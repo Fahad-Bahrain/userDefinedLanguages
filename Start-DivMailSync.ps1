@@ -121,6 +121,20 @@ Write-Host "`n>>> Generating sync report..." -ForegroundColor Cyan
 $summaryCSV  = Get-ChildItem "$ReportFolder\SyncSummary_*.csv" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 $summaryData = if ($summaryCSV) { Import-Csv $summaryCSV.FullName } else { @() }
 
+# Get current member counts for each division group from AD
+$groupCounts = @{}
+try {
+    Import-Module ActiveDirectory -ErrorAction SilentlyContinue
+    foreach ($s in $scripts) {
+        try {
+            $grp = Get-ADGroup -Identity $s.Group -Properties member -ErrorAction Stop
+            $groupCounts[$s.Group] = $grp.member.Count
+        } catch {
+            $groupCounts[$s.Group] = "N/A"
+        }
+    }
+} catch { }
+
 # ------------------------------------------------------------------------------
 #  BUILD HTML EMAIL
 # ------------------------------------------------------------------------------
@@ -140,16 +154,19 @@ $scriptRows = $results | ForEach-Object {
 }
 
 $syncRows = $summaryData | ForEach-Object {
+    $cnt = if ($groupCounts.ContainsKey($_.Group)) { $groupCounts[$_.Group] } else { '-' }
     "<tr>
         <td>$($_.Group)</td>
         <td style='text-align:center;color:green'><b>$($_.Added)</b></td>
         <td style='text-align:center;color:red'><b>$($_.Removed)</b></td>
         <td style='text-align:center'><b>$($_.TotalChange)</b></td>
+        <td style='text-align:center;font-weight:bold;font-size:15px'>$cnt</td>
     </tr>"
 }
 
 $totalAdded   = ($summaryData | Measure-Object -Property Added   -Sum).Sum
 $totalRemoved = ($summaryData | Measure-Object -Property Removed -Sum).Sum
+$totalMembers = ($groupCounts.Values | Where-Object { $_ -match '^\d+$' } | Measure-Object -Sum).Sum
 $credNote     = if ($adUsername) { "Executed as: <b>$adUsername</b>" } else { "Executed as: <b>current session user</b>" }
 
 $htmlBody = @"
@@ -173,7 +190,7 @@ $htmlBody = @"
 <h3 style="color:#1a5276">Sync Summary</h3>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">
   <tr style="background:#1a5276;color:white">
-    <th>Group</th><th>Added</th><th>Removed</th><th>Total Changes</th>
+    <th>Group</th><th>Added</th><th>Removed</th><th>Total Changes</th><th>Current Members</th>
   </tr>
   $($syncRows -join "`n")
   <tr style="background:#eaf2ff;font-weight:bold">
@@ -181,6 +198,7 @@ $htmlBody = @"
     <td style="text-align:center;color:green">$totalAdded</td>
     <td style="text-align:center;color:red">$totalRemoved</td>
     <td style="text-align:center">$($totalAdded + $totalRemoved)</td>
+    <td style="text-align:center;font-size:15px">$totalMembers</td>
   </tr>
 </table>
 
