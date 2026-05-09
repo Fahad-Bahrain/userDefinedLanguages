@@ -56,22 +56,20 @@ Write-Host "=====================================================" -ForegroundCo
 # ── Task definitions ──────────────────────────────────────────────────────────
 $tasks = @(
     @{
-        Name        = "AD Mail Sync (Silent)"
-        Description = "Exports AD mail users and syncs AllEKKEmployees, SystemMailUsers, AllMailUsers_Disabled groups. Sends HTML summary email."
-        Script      = "ad-sync_silent.ps1"
-        Arguments   = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptRoot\ad-sync_silent.ps1`" -Apply -CredPath `"$ScriptRoot\cred.xml`" -LogDir `"$ScriptRoot\Logs`""
-        TriggerTime = "23:30"
+        Name      = "AD Mail Sync (Silent)"
+        Script    = "ad-sync_silent.ps1"
+        Args      = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptRoot\ad-sync_silent.ps1`" -Apply -CredPath `"$ScriptRoot\cred.xml`" -LogDir `"$ScriptRoot\Logs`""
+        StartTime = "23:30"
     },
     @{
-        Name        = "AD-MailSync - Master Sync & Report"
-        Description = "Runs all Division Group sync scripts (TSC, TSR, TSP, Logistics) and sends HTML summary email."
-        Script      = "Start-DivMailSync.ps1"
-        Arguments   = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptRoot\Start-DivMailSync.ps1`""
-        TriggerTime = "23:45"
+        Name      = "AD-MailSync - Master Sync & Report"
+        Script    = "Start-DivMailSync.ps1"
+        Args      = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptRoot\Start-DivMailSync.ps1`""
+        StartTime = "23:45"
     }
 )
 
-# ── Register each task ────────────────────────────────────────────────────────
+# ── Register each task via schtasks.exe ───────────────────────────────────────
 foreach ($t in $tasks) {
 
     $scriptPath = Join-Path $ScriptRoot $t.Script
@@ -81,38 +79,32 @@ foreach ($t in $tasks) {
     }
 
     # Remove existing task if present
-    if (Get-ScheduledTask -TaskName $t.Name -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $t.Name -Confirm:$false
+    $existing = schtasks /query /tn $t.Name 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        schtasks /delete /tn $t.Name /f | Out-Null
         Write-Host "  Removed existing task: $($t.Name)" -ForegroundColor DarkGray
     }
 
-    $action  = New-ScheduledTaskAction `
-                   -Execute  "powershell.exe" `
-                   -Argument $t.Arguments `
-                   -WorkingDirectory $ScriptRoot
+    $tr = "powershell.exe $($t.Args)"
 
-    $trigger = New-ScheduledTaskTrigger -Daily -At $t.TriggerTime
+    $result = schtasks /create `
+        /tn  $t.Name `
+        /tr  $tr `
+        /sc  DAILY `
+        /st  $t.StartTime `
+        /ru  $RunAsUser `
+        /rp  $RunAsPassword `
+        /rl  HIGHEST `
+        /f 2>&1
 
-    $settings = New-ScheduledTaskSettingsSet `
-                    -ExecutionTimeLimit    (New-TimeSpan -Hours 2) `
-                    -StartWhenAvailable `
-                    -MultipleInstances     IgnoreNew `
-                    -RunOnlyIfNetworkAvailable
-
-    Register-ScheduledTask `
-        -TaskName    $t.Name `
-        -Description $t.Description `
-        -Action      $action `
-        -Trigger     $trigger `
-        -Settings    $settings `
-        -User        $RunAsUser `
-        -Password    $RunAsPassword `
-        -RunLevel    Highest `
-        -Force | Out-Null
-
-    Write-Host "  [OK] Registered : $($t.Name)" -ForegroundColor Green
-    Write-Host "       Runs at    : $($t.TriggerTime) daily" -ForegroundColor White
-    Write-Host "       Script     : $scriptPath" -ForegroundColor White
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  [OK] Registered : $($t.Name)" -ForegroundColor Green
+        Write-Host "       Runs at    : $($t.StartTime) daily" -ForegroundColor White
+        Write-Host "       Script     : $scriptPath" -ForegroundColor White
+    } else {
+        Write-Warning "Failed to register task: $($t.Name)"
+        Write-Host $result -ForegroundColor Red
+    }
     Write-Host ""
 }
 
