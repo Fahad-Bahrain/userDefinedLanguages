@@ -312,12 +312,11 @@ function showOutput(text, success) {
 }
 
 // ── Printer type helpers ──────────────────────────────────────────────────
-// Laser  (XL, EL, SL, HL, BR families) — Print PDF only
-function isLaser(q)     { return /XL|EL|SL|ZB/i.test(q) || /HLps|BRps/i.test(q) || /_HL\d|_BR\d/i.test(q); }
-// Dot-matrix (LD, TA, TL families) — Print Text only
-function isDotMatrix(q) { return /_LD|_TA|_TL/i.test(q); }
-// Barcode (ZD family) — both print buttons disabled
-function isBarcode(q)   { return /ZD/i.test(q); }
+// Laser  (HL, EL, BR, BZ, XL, SL, ZB) — Print PDF only
+function isLaser(q)     { return /HL|EL|BR|BZ|XL|SL|ZB/i.test(q); }
+// Dot-matrix / Barcode (LD, ZD, TA, TL) — Print Text only
+function isDotMatrix(q) { return /LD|ZD|TA|TL/i.test(q); }
+function isBarcode(q)   { return false; }
 
 function applyPrintButtonRules() {
   document.querySelectorAll('.printer-row').forEach(row => {
