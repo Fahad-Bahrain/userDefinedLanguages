@@ -21,13 +21,13 @@
     "password": "Vipin@123",
     "name": "Vipin",
     "role": "user",
-    "prefixes": ["TP"]
+    "prefixes": ["TP", "MCSR", "MCP"]
   },
   "vimala": {
     "password": "Vimala@123",
     "name": "Vimala",
     "role": "user",
-    "prefixes": ["MCP", "MCS"]
+    "prefixes": ["MCS"]
   },
   "azzat": {
     "password": "Azzat@123",
