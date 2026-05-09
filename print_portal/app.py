@@ -292,23 +292,39 @@ def api_action():
 
     # ── cancel first job ──
     elif action == "cancel_first":
-        out, err, ok = ssh_run(f"lpstat -o{queue} 2>/dev/null")
+        # Don't suppress stderr — on some AIX versions output goes there
+        out, err, ok = ssh_run(f"lpstat -o{queue}")
         if not ok:
-            return jsonify({"success": False, "output": err})
-        if not out.strip():
+            return jsonify({"success": False, "output": err or "SSH connection failed."})
+
+        # Combine stdout + stderr so we don't miss anything
+        raw = (out + "\n" + err).strip()
+        if not raw:
             return jsonify({"success": True, "output": f"No jobs found in queue {queue}."})
-        # Parse AIX lpstat output: find first RUNNING or QUEUED job number
+
+        # Try regex: any AIX status word followed by job number
         job_id = None
-        for line in out.splitlines():
-            match = re.search(r'(?:RUNNING|QUEUED)\s+(\d+)', line, re.IGNORECASE)
-            if match:
-                job_id = match.group(1)
+        for line in raw.splitlines():
+            m = re.search(r'(?:RUNNING|QUEUED|HELD|WAITING|PAUSED|ACTIVE)\s+(\d+)', line, re.IGNORECASE)
+            if m:
+                job_id = m.group(1)
                 break
+
+        # Fallback: awk extracts 4th column (Job number) from first data row
         if not job_id:
-            return jsonify({"success": True, "output": f"No active job found in queue {queue}.\n{out}"})
+            awk_out, _, _ = ssh_run(
+                "lpstat -o" + queue + " | awk 'NR>2 && NF>=4 {print $4; exit}'"
+            )
+            if awk_out.strip().isdigit():
+                job_id = awk_out.strip()
+
+        if not job_id:
+            return jsonify({"success": True,
+                            "output": f"Could not find job ID in queue {queue}.\n\nRaw lpstat output:\n{raw}"})
+
         out2, err2, ok2 = ssh_run(f"cancel {job_id} 2>&1")
         return jsonify({"success": ok2,
-                        "output": f"Cancelled job {job_id} from {queue}.\n{out2 or err2}"})
+                        "output": f"Cancelled job {job_id} from {queue}.\n{out2 or err2 or 'Done.'}"})
 
     # ── cancel all jobs ──
     elif action == "cancel_all":
