@@ -58,8 +58,8 @@ $tasks = @(
     @{
         Name        = "AD Mail Sync (Silent)"
         Description = "Exports AD mail users and syncs AllEKKEmployees, SystemMailUsers, AllMailUsers_Disabled groups. Sends HTML summary email."
-        Script      = "ad-sync_silent.ps1"
-        Arguments   = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptRoot\ad-sync_silent.ps1`" -Apply -CredPath `"$ScriptRoot\cred.xml`" -LogDir `"$ScriptRoot\Logs`""
+        Script      = "ad-sync_silent_PATCHED.ps1"
+        Arguments   = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptRoot\ad-sync_silent_PATCHED.ps1`" -Apply -CredPath `"$ScriptRoot\cred.xml`" -LogDir `"$ScriptRoot\Logs`""
         TriggerTime = "23:30"
     },
     @{
