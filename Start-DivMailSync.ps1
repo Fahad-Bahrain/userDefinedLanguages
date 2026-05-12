@@ -151,20 +151,6 @@ try {
 #  BUILD HTML EMAIL
 # ------------------------------------------------------------------------------
 
-$scriptRows = $results | ForEach-Object {
-    $color = switch ($_.Status) {
-        "SUCCESS" { "#d4edda" }
-        "WARNING" { "#fff3cd" }
-        "FAILED"  { "#f8d7da" }
-    }
-    "<tr style='background:$color'>
-        <td>$($_.Group)</td>
-        <td>$($_.Script)</td>
-        <td><b>$($_.Status)</b></td>
-        <td>$($_.Duration)</td>
-    </tr>"
-}
-
 $syncRows = $syncData | ForEach-Object {
     $cnt = if ($groupCounts.ContainsKey($_.Group)) { $groupCounts[$_.Group] } else { '-' }
     "<tr>
@@ -189,15 +175,6 @@ $htmlBody = @"
 <p>$credNote</p>
 <hr/>
 
-<h3 style="color:#1a5276">Script Execution Summary</h3>
-<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">
-  <tr style="background:#1a5276;color:white">
-    <th>Group</th><th>Script</th><th>Status</th><th>Duration</th>
-  </tr>
-  $($scriptRows -join "`n")
-</table>
-
-<br/>
 <h3 style="color:#1a5276">Sync Summary</h3>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%">
   <tr style="background:#1a5276;color:white">
