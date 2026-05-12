@@ -79,7 +79,8 @@ $scripts = @(
     @{ File = "Sync-EKKTyresEmployees.ps1";       Group = "EK Kanoo Tyres Division Group"        }
 )
 
-$results = @()
+$results    = @()
+$syncData   = @()
 
 # ------------------------------------------------------------------------------
 #  RUN EACH SYNC SCRIPT
@@ -106,23 +107,31 @@ foreach ($s in $scripts) {
 
     $duration = [math]::Round(((Get-Date) - $start).TotalSeconds)
 
-    $results += [PSCustomObject]@{
-        Group    = $s.Group
-        Script   = $s.File
-        Status   = $status
-        Duration = "${duration}s"
+    # Derive log prefix from script filename: strip "Sync-" prefix and ".ps1" suffix, append "_Sync_"
+    $logPrefix = ($s.File -replace '^Sync-', '') -replace '\.ps1$', '_Sync_'
+
+    # Parse added/removed counts from the log file written during this run
+    $added = 0; $removed = 0
+    $logFile = Get-ChildItem "$LogFolder\${logPrefix}*.log" -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -ge $start } |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($logFile) {
+        $logContent = Get-Content $logFile.FullName -ErrorAction SilentlyContinue
+        $addLine = $logContent | Where-Object { $_ -match '(ADDED successfully|Would be ADDED)\s*:\s*(\d+)' } | Select-Object -Last 1
+        $remLine = $logContent | Where-Object { $_ -match '(REMOVED successfully|Would be REMOVED)\s*:\s*(\d+)' } | Select-Object -Last 1
+        if ($addLine -match ':\s*(\d+)\s*$') { $added   = [int]$Matches[1] }
+        if ($remLine -match ':\s*(\d+)\s*$') { $removed = [int]$Matches[1] }
     }
+
+    $results  += [PSCustomObject]@{ Group = $s.Group; Script = $s.File; Status = $status; Duration = "${duration}s" }
+    $syncData += [PSCustomObject]@{ Group = $s.Group; Added = $added; Removed = $removed }
 }
 
-# ------------------------------------------------------------------------------
-#  GENERATE CSV REPORT (used to build sync summary table)
-# ------------------------------------------------------------------------------
-
-Write-Host "`n>>> Generating sync report..." -ForegroundColor Cyan
-& PowerShell.exe -ExecutionPolicy Bypass -NonInteractive -File "$ScriptRoot\Export-SyncReport.ps1"
-
-$summaryCSV  = Get-ChildItem "$ReportFolder\SyncSummary_*.csv" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-$summaryData = if ($summaryCSV) { Import-Csv $summaryCSV.FullName } else { @() }
+# Also run Export-SyncReport.ps1 if it exists (keeps legacy CSV output intact)
+if (Test-Path "$ScriptRoot\Export-SyncReport.ps1") {
+    Write-Host "`n>>> Generating legacy sync report CSV..." -ForegroundColor Cyan
+    & PowerShell.exe -ExecutionPolicy Bypass -NonInteractive -File "$ScriptRoot\Export-SyncReport.ps1"
+}
 
 # Get current member counts for each division group from AD
 $groupCounts = @{}
@@ -156,19 +165,19 @@ $scriptRows = $results | ForEach-Object {
     </tr>"
 }
 
-$syncRows = $summaryData | ForEach-Object {
+$syncRows = $syncData | ForEach-Object {
     $cnt = if ($groupCounts.ContainsKey($_.Group)) { $groupCounts[$_.Group] } else { '-' }
     "<tr>
         <td>$($_.Group)</td>
         <td style='text-align:center;color:green'><b>$($_.Added)</b></td>
         <td style='text-align:center;color:red'><b>$($_.Removed)</b></td>
-        <td style='text-align:center'><b>$($_.TotalChange)</b></td>
+        <td style='text-align:center'><b>$($_.Added + $_.Removed)</b></td>
         <td style='text-align:center;font-weight:bold;font-size:15px'>$cnt</td>
     </tr>"
 }
 
-$totalAdded   = ($summaryData | Measure-Object -Property Added   -Sum).Sum
-$totalRemoved = ($summaryData | Measure-Object -Property Removed -Sum).Sum
+$totalAdded   = ($syncData | Measure-Object -Property Added   -Sum).Sum
+$totalRemoved = ($syncData | Measure-Object -Property Removed -Sum).Sum
 $totalMembers = ($groupCounts.Values | Where-Object { $_ -match '^\d+$' } | Measure-Object -Sum).Sum
 $credNote     = if ($adUsername) { "Executed as: <b>$adUsername</b>" } else { "Executed as: <b>current session user</b>" }
 
