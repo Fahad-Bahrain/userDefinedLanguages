@@ -308,8 +308,9 @@ Log file: $LOG_FILE
     fi
 fi
 
-# Extract process number from output  (ANS8003I Process number NN started.)
-PROC_NUM=$(echo "$BACKUP_OUT" | grep "Process number" | awk '{print $3}')
+# Extract process number from output
+# "ANS8003I Process number 32 started."  →  field 4 is the number
+PROC_NUM=$(echo "$BACKUP_OUT" | grep "ANS8003I" | awk '{print $4}')
 
 # If ANR2433E (already running), find the existing DB backup process number
 if [ -z "$PROC_NUM" ]; then
