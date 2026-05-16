@@ -182,7 +182,7 @@ SCRIPT_START_TS=$(date +%s)
 # ===========================================================================
 log_section "STEP 1: Check scratch volume availability  ($TSM_LIBRARY)"
 
-SCRATCH_OUT=$(tsm "query libvolume $TSM_LIBRARY status=scratch")
+SCRATCH_OUT=$(tsm "query libvolume $TSM_LIBRARY")
 log "$SCRATCH_OUT"
 
 # count lines that contain actual volume entries (not header/blank)
