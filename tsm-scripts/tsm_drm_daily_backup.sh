@@ -406,10 +406,50 @@ log_section "STEP 5: Run PREPARE  (generate disaster recovery files)"
 PREPARE_OUT=$(tsm "prepare")
 log "$PREPARE_OUT"
 
+# prepare also runs as a background process – wait for it to finish
+# before copying the file, otherwise file will be 0 bytes
+PREP_PROC=$(echo "$PREPARE_OUT" | grep "ANS8003I" | awk '{print $4}')
+log "Prepare process number: ${PREP_PROC:-unknown}"
+
+if [ -n "$PREP_PROC" ]; then
+    log "Waiting for prepare process $PREP_PROC to complete (checking every 10s) ..."
+    PREP_WAIT=0
+    while true; do
+        sleep 10
+        PREP_WAIT=$(( PREP_WAIT + 1 ))
+        PREP_CHECK=$(tsm "query process $PREP_PROC")
+        if echo "$PREP_CHECK" | egrep -qi "prepare|recovery plan"; then
+            log "  [${PREP_WAIT}x10s] Prepare still in progress ..."
+        else
+            log "  Prepare process $PREP_PROC completed."
+            break
+        fi
+        # Safety timeout: 10 minutes
+        if [ "$PREP_WAIT" -gt 60 ]; then
+            log "WARNING: Prepare process timeout after 10 minutes."
+            break
+        fi
+    done
+else
+    # No process number – give it 30 seconds to finish writing
+    log "Could not get prepare process number – waiting 30s for file to be written ..."
+    sleep 30
+fi
+
 # TSM writes the prepare file with a timestamp name (e.g. 20260516.190032)
 # into the TSM instance home directory – pick the newest one
 PREPARE_FILE=$(ls -t "${TSM_INST_HOME}"/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9] 2>/dev/null | head -1)
 log "Prepare file: ${PREPARE_FILE:-not found}"
+
+# Verify file has content
+if [ -f "$PREPARE_FILE" ]; then
+    PREP_SIZE=$(ls -l "$PREPARE_FILE" | awk '{print $5}')
+    log "Prepare file size: ${PREP_SIZE} bytes"
+    if [ "${PREP_SIZE:-0}" -eq 0 ]; then
+        log "WARNING: Prepare file is empty – TSM prepare may not have completed correctly."
+        WARN_MSGS="${WARN_MSGS}  - prepare file is 0 bytes\n"
+    fi
+fi
 
 # ===========================================================================
 # STEP 6  –  Copy 3 DR files to /temp  +  7-day rotation
