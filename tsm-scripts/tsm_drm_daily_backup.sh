@@ -239,13 +239,24 @@ else
 
     echo "$VR_TAPES" | while read TAPE; do
         [ -z "$TAPE" ] && continue
+
+        # Step 2a: Update DRM state VaultRetrieve -> Onsite
         log "  Moving $TAPE  VaultRetrieve -> Onsite ..."
         MOVE_OUT=$(tsm "move drmedia $TAPE wherest=vaultretrieve tost=onsite")
         log "  $MOVE_OUT"
+
+        # Step 2b: Tape is in a library SLOT (not IO station) so use
+        # update libvolume to set it Scratch – do NOT use checkin search=bulk
+        # which only finds tapes physically placed in the IO station
+        log "  Setting $TAPE status=Scratch in library slot ..."
+        UPD_OUT=$(tsm "update libvolume $TSM_LIBRARY $TAPE status=scratch")
+        log "  $UPD_OUT"
+
         TAPE_RECLAIMED="${TAPE_RECLAIMED} ${TAPE}"
     done
 
-    log "Checking reclaimed tapes back into $TSM_LIBRARY as Scratch (bulk / barcode) ..."
+    # Separate: check IO station for any NEW tapes manually loaded by operator
+    log "Checking IO station for any manually loaded new tapes ..."
     CHECKIN_OUT=$(tsm "checkin libvolume $TSM_LIBRARY search=bulk status=scratch checkl=barcode waitt=0")
     log "$CHECKIN_OUT"
 fi
