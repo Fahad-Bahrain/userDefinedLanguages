@@ -310,6 +310,15 @@ fi
 
 # Extract process number from output  (ANS8003I Process number NN started.)
 PROC_NUM=$(echo "$BACKUP_OUT" | grep "Process number" | awk '{print $3}')
+
+# If ANR2433E (already running), find the existing DB backup process number
+if [ -z "$PROC_NUM" ]; then
+    log "Querying active processes to find existing DB backup ..."
+    ALL_PROCS=$(tsm "query process")
+    log "$ALL_PROCS"
+    PROC_NUM=$(echo "$ALL_PROCS" | grep -i "Database Backup" | awk '{print $1}' | head -1)
+fi
+
 log "Backup process number: ${PROC_NUM:-unknown}"
 
 # ---- Wait for backup process to finish (poll every 60 seconds) ----
@@ -321,8 +330,8 @@ if [ -n "$PROC_NUM" ]; then
         WAIT_MIN=$(( WAIT_MIN + 1 ))
         PROC_CHECK=$(tsm "query process $PROC_NUM")
         if echo "$PROC_CHECK" | grep -qi "Database Backup"; then
-            PROGRESS=$(echo "$PROC_CHECK" | grep -i "Bytes backed up" | sed 's/.*Bytes backed up://;s/\..*//' | tr -d ' ')
-            log "  [${WAIT_MIN} min] Backup in progress – bytes backed up: ${PROGRESS:-0}"
+            PROGRESS=$(echo "$PROC_CHECK" | grep -i "Bytes backed up" | awk -F: '{print $2}' | tr -d ' \n')
+            log "  [${WAIT_MIN} min] In progress – Bytes backed up: ${PROGRESS:-0}"
         else
             log "  [${WAIT_MIN} min] Process $PROC_NUM no longer active – backup finished."
             break
@@ -335,7 +344,7 @@ if [ -n "$PROC_NUM" ]; then
         fi
     done
 else
-    log "WARNING: Could not determine process number – cannot wait for completion."
+    log "WARNING: No active DB backup process found – cannot wait for completion."
     WARN_MSGS="${WARN_MSGS}  - backup process number unknown; result not confirmed\n"
 fi
 
@@ -345,7 +354,8 @@ log "Backup duration: ${BACKUP_DURATION}s  ($(( BACKUP_DURATION / 60 )) min)"
 
 # Verify result from activity log
 log "Checking activity log for backup result ..."
-ACT_OUT=$(tsm "query actlog days=1 search=ANR2280")
+TODAY_DATE=$(date '+%m/%d/%Y')
+ACT_OUT=$(tsm "query actlog begindate=$TODAY_DATE search=ANR2280")
 log "$ACT_OUT"
 if echo "$ACT_OUT" | grep -qi "ANR2284I\|successfully completed\|ANR2280I"; then
     BACKUP_VOL=$(echo "$ACT_OUT" | grep -i "volume" | awk '{print $NF}' | tail -1)
