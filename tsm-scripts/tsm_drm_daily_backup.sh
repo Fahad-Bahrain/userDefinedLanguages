@@ -225,7 +225,12 @@ log "$VR_OUT"
 
 # Extract volume names from comma-separated dsmadmc output
 # First field of each data row, skip header and blank lines
-VR_TAPES=$(echo "$VR_OUT" | awk -F',' 'NR>1 && $1 ~ /^[A-Z0-9]/ {gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1}')
+# Only parse volume names if query succeeded (no ANR2034E "no match" error)
+if echo "$VR_OUT" | grep -q "ANR2034E"; then
+    VR_TAPES=""
+else
+    VR_TAPES=$(echo "$VR_OUT" | awk -F',' 'NR>1 && $1 ~ /^[A-Z0-9]/ {gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1}')
+fi
 
 if [ -z "$VR_TAPES" ]; then
     log "No tapes in VaultRetrieve state today – skipping reclaim step."
@@ -311,7 +316,7 @@ log "Backup completed OK  |  Volume used: ${BACKUP_VOL:-see log}"
 # ===========================================================================
 log_section "STEP 5: Run PREPARE  (generate disaster recovery files)"
 
-PREPARE_OUT=$(tsm "prepare stgpools=yes")
+PREPARE_OUT=$(tsm "prepare")
 log "$PREPARE_OUT"
 
 # TSM writes the prepare file with a timestamp name (e.g. 20260516.190032)
