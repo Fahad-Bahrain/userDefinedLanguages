@@ -282,7 +282,7 @@ log "$BACKUP_OUT"
 log "Return code: $BACKUP_RC  |  Duration: ${BACKUP_DURATION}s"
 
 # Detect errors – use egrep (AIX compatible extended regex)
-if echo "$BACKUP_OUT" | egrep -qi "ANS[0-9]+E|error|fail"; then
+if echo "$BACKUP_OUT" | egrep -qi "ANR[0-9]+E|ANS[0-9]+E|error|fail"; then
     OVERALL_STATUS="ERROR"
     log "ERROR: TSM DB backup reported errors!"
 
