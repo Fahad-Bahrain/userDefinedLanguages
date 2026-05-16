@@ -267,43 +267,107 @@ else
 fi
 
 # ===========================================================================
-# STEP 4  –  TSM DB Full Backup
+# STEP 4  –  TSM DB Full Backup  (waits for completion before proceeding)
 # ===========================================================================
 log_section "STEP 4: TSM DB Full Backup  (type=full  devc=$TSM_DEVCLASS)"
 
 T1=$(date +%s)
 BACKUP_OUT=$(tsm "backup db type=full devc=$TSM_DEVCLASS")
-BACKUP_RC=$?
-T2=$(date +%s)
-BACKUP_DURATION=$(( T2 - T1 ))
-
-log "Backup output:"
+log "Backup submit output:"
 log "$BACKUP_OUT"
-log "Return code: $BACKUP_RC  |  Duration: ${BACKUP_DURATION}s"
 
-# Detect errors – use egrep (AIX compatible extended regex)
-if echo "$BACKUP_OUT" | egrep -qi "ANR[0-9]+E|ANS[0-9]+E|error|fail"; then
-    OVERALL_STATUS="ERROR"
-    log "ERROR: TSM DB backup reported errors!"
-
-    send_email \
-        "[ERROR] TSM DR DB Backup FAILED - $(date '+%Y-%m-%d')" \
-"ERROR: TSM DRM DB Backup FAILED on server $TSM_SERVER
+# Check for immediate hard errors (e.g. already in progress, no device class)
+if echo "$BACKUP_OUT" | egrep -qi "ANR[0-9]+E|ANS[0-9]+E"; then
+    if echo "$BACKUP_OUT" | grep -q "ANR2433E"; then
+        # Another backup already running – treat as warning, not fatal
+        log "WARNING: Another backup is already in progress (ANR2433E). Will wait for it."
+        WARN_MSGS="${WARN_MSGS}  - backup was already in progress when script ran\n"
+    else
+        # Real error – fail immediately
+        T2=$(date +%s)
+        BACKUP_DURATION=$(( T2 - T1 ))
+        OVERALL_STATUS="ERROR"
+        log "ERROR: TSM DB backup failed to start!"
+        send_email \
+            "[ERROR] TSM DR DB Backup FAILED - $(date '+%Y-%m-%d')" \
+"ERROR: TSM DRM DB Backup FAILED to start on $TSM_SERVER
 ==============================================================
 Date    : $(date)
 Server  : $TSM_SERVER
 DevClass: $TSM_DEVCLASS
 Library : $TSM_LIBRARY
-Duration: ${BACKUP_DURATION}s
 
---- Backup Output ---
+--- Output ---
 $BACKUP_OUT
 
 Please investigate immediately.
 Log file: $LOG_FILE
 
 -- Automated message from $SCRIPT_NAME on $(hostname) --"
+        exit 2
+    fi
+fi
 
+# Extract process number from output  (ANS8003I Process number NN started.)
+PROC_NUM=$(echo "$BACKUP_OUT" | grep "Process number" | awk '{print $3}')
+log "Backup process number: ${PROC_NUM:-unknown}"
+
+# ---- Wait for backup process to finish (poll every 60 seconds) ----
+if [ -n "$PROC_NUM" ]; then
+    log "Waiting for backup process $PROC_NUM to complete (checking every 60s) ..."
+    WAIT_MIN=0
+    while true; do
+        sleep 60
+        WAIT_MIN=$(( WAIT_MIN + 1 ))
+        PROC_CHECK=$(tsm "query process $PROC_NUM")
+        if echo "$PROC_CHECK" | grep -qi "Database Backup"; then
+            PROGRESS=$(echo "$PROC_CHECK" | grep -i "Bytes backed up" | sed 's/.*Bytes backed up://;s/\..*//' | tr -d ' ')
+            log "  [${WAIT_MIN} min] Backup in progress – bytes backed up: ${PROGRESS:-0}"
+        else
+            log "  [${WAIT_MIN} min] Process $PROC_NUM no longer active – backup finished."
+            break
+        fi
+        # Safety timeout: 8 hours
+        if [ "$WAIT_MIN" -gt 480 ]; then
+            log "WARNING: Backup wait timeout after 8 hours."
+            WARN_MSGS="${WARN_MSGS}  - backup process timed out after 8 hours\n"
+            break
+        fi
+    done
+else
+    log "WARNING: Could not determine process number – cannot wait for completion."
+    WARN_MSGS="${WARN_MSGS}  - backup process number unknown; result not confirmed\n"
+fi
+
+T2=$(date +%s)
+BACKUP_DURATION=$(( T2 - T1 ))
+log "Backup duration: ${BACKUP_DURATION}s  ($(( BACKUP_DURATION / 60 )) min)"
+
+# Verify result from activity log
+log "Checking activity log for backup result ..."
+ACT_OUT=$(tsm "query actlog days=1 search=ANR2280")
+log "$ACT_OUT"
+if echo "$ACT_OUT" | grep -qi "ANR2284I\|successfully completed\|ANR2280I"; then
+    BACKUP_VOL=$(echo "$ACT_OUT" | grep -i "volume" | awk '{print $NF}' | tail -1)
+    log "Backup confirmed successful in activity log."
+elif echo "$ACT_OUT" | egrep -qi "ANR[0-9]+E|fail"; then
+    OVERALL_STATUS="ERROR"
+    log "ERROR: Activity log shows backup failure!"
+    send_email \
+        "[ERROR] TSM DR DB Backup FAILED - $(date '+%Y-%m-%d')" \
+"ERROR: TSM DRM DB Backup FAILED on $TSM_SERVER
+==============================================================
+Date    : $(date)
+Server  : $TSM_SERVER
+DevClass: $TSM_DEVCLASS
+Duration: ${BACKUP_DURATION}s  ($(( BACKUP_DURATION / 60 )) min)
+
+--- Activity Log ---
+$ACT_OUT
+
+Log file: $LOG_FILE
+
+-- Automated message from $SCRIPT_NAME on $(hostname) --"
     exit 2
 fi
 
