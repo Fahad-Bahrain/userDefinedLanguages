@@ -317,7 +317,8 @@ if [ -z "$PROC_NUM" ]; then
     log "Querying active processes to find existing DB backup ..."
     ALL_PROCS=$(tsm "query process")
     log "$ALL_PROCS"
-    PROC_NUM=$(echo "$ALL_PROCS" | grep -i "Database Backup" | awk '{print $1}' | head -1)
+    # -comma flag makes output CSV: "32,Database Backup,,Cancel pending.,"
+    PROC_NUM=$(echo "$ALL_PROCS" | grep -i "Database Backup" | awk -F',' '{print $1}' | tr -d ' ' | head -1)
 fi
 
 log "Backup process number: ${PROC_NUM:-unknown}"
@@ -427,43 +428,55 @@ log_section "STEP 7: Send SUCCESS notification"
 SCRIPT_END_TS=$(date +%s)
 TOTAL_DURATION=$(( SCRIPT_END_TS - SCRIPT_START_TS ))
 
-WARN_BLOCK=""
-[ -n "$WARN_MSGS" ] && WARN_BLOCK="
-WARNINGS DURING RUN:
-$(printf '%b' "$WARN_MSGS")
-"
+# Pre-compute all dynamic values to avoid ksh quoting issues inside strings
+NOW_DT=$(date)
+NOW_DATE=$(date '+%Y-%m-%d')
+BACKUP_MIN=$(( BACKUP_DURATION / 60 ))
+TOTAL_MIN=$(( TOTAL_DURATION / 60 ))
+COPIED_LIST=$(printf '%b' "$COPIED_FILES")
+RECLAIMED_LIST="${TAPE_RECLAIMED:- none today}"
+EXPIRE_SHOW="${EXPIRE_DATE:-skipped}"
+HOSTNAME_VAL=$(hostname)
 
-send_email \
-    "[SUCCESS] TSM DR DRM Backup Completed - $(date '+%Y-%m-%d')" \
-"TSM DRM Daily Backup completed SUCCESSFULLY on $TSM_SERVER
+WARN_BLOCK=""
+if [ -n "$WARN_MSGS" ]; then
+    WARN_BLOCK="
+WARNINGS DURING RUN:
+$(printf '%b' "$WARN_MSGS")"
+fi
+
+SUCCESS_SUBJECT="[SUCCESS] TSM DR DRM Backup Completed - ${NOW_DATE}"
+SUCCESS_BODY="TSM DRM Daily Backup completed SUCCESSFULLY on ${TSM_SERVER}
 ==============================================================
-Date          : $(date)
-Server        : $TSM_SERVER
-Device Class  : $TSM_DEVCLASS
-Library       : $TSM_LIBRARY
-Scratch Tapes : $SCRATCH_COUNT available before backup
+Date          : ${NOW_DT}
+Server        : ${TSM_SERVER}
+Device Class  : ${TSM_DEVCLASS}
+Library       : ${TSM_LIBRARY}
+Scratch Tapes : ${SCRATCH_COUNT} available before backup
 
 BACKUP SUMMARY
 --------------
 Volume Used   : ${BACKUP_VOL:-see log}
-Backup Time   : ${BACKUP_DURATION}s
-Total Runtime : ${TOTAL_DURATION}s
+Backup Time   : ${BACKUP_DURATION}s  (${BACKUP_MIN} min)
+Total Runtime : ${TOTAL_DURATION}s  (${TOTAL_MIN} min)
 
 TAPE RECLAIM  (VaultRetrieve -> Onsite -> Scratch)
 ---------------------------------------------------
-Tapes reclaimed : ${TAPE_RECLAIMED:- none today}
+Tapes reclaimed : ${RECLAIMED_LIST}
 
 VOLUME HISTORY CLEANUP
 ----------------------
-Deleted DBB entries on/before : ${EXPIRE_DATE:-skipped}
+Deleted DBB entries on/before : ${EXPIRE_SHOW}
 Retention policy              : ${TSM_RETENTION_DAYS} days
 
-FILES COPIED TO $TEMP_DIR  (7-day rotation active)
-$(printf '%b' "$COPIED_FILES")
-$WARN_BLOCK
-Log file: $LOG_FILE
+FILES COPIED TO ${TEMP_DIR}  (7-day rotation active)
+${COPIED_LIST}
+${WARN_BLOCK}
+Log file: ${LOG_FILE}
 
--- Automated message from $SCRIPT_NAME on $(hostname) --"
+-- Automated message from ${SCRIPT_NAME} on ${HOSTNAME_VAL} --"
+
+send_email "$SUCCESS_SUBJECT" "$SUCCESS_BODY"
 
 log_section "COMPLETED  $SCRIPT_NAME  |  $(date)  |  Status: $OVERALL_STATUS  |  ${TOTAL_DURATION}s"
 exit 0
